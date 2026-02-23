@@ -26,6 +26,7 @@ def api_decompose():
 
     api_key = data.get("api_key", "").strip()
     base_url = data.get("base_url", "").strip()
+    model = data.get("model", "claude-sonnet-4-5").strip() or "claude-sonnet-4-5"
     task = data.get("task", "").strip()
     weeks = int(data.get("weeks", 1))
     start_date_str = data.get("start_date", "")
@@ -40,7 +41,7 @@ def api_decompose():
         return jsonify({"error": "Invalid start_date format, expected YYYY-MM-DD"}), 400
 
     try:
-        subtasks = decompose_task(api_key, base_url, task, weeks, start_date, daily_slots)
+        subtasks = decompose_task(api_key, base_url, model, task, weeks, start_date, daily_slots)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -84,4 +85,4 @@ def api_generate_ics():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -3,7 +3,7 @@ import re
 from openai import OpenAI
 
 
-def decompose_task(api_key, base_url, task, weeks, start_date, daily_slots) -> list:
+def decompose_task(api_key, base_url, model, task, weeks, start_date, daily_slots) -> list:
     client = OpenAI(api_key=api_key, base_url=base_url)
 
     total_days = weeks * 7
@@ -33,7 +33,7 @@ Rules:
 - Order subtasks logically (earlier steps first)"""
 
     response = client.chat.completions.create(
-        model="claude-sonnet-4-5",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
     )
