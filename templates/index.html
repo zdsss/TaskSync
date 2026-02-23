@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f2f2f7;
+      color: #1c1c1e;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #6e6e73;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6e6e73;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+
+    label:first-child { margin-top: 0; }
+
+    input, textarea, select {
+      width: 100%;
+      font-size: 16px;
+      padding: 10px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 8px;
+      background: #f9f9fb;
+      color: #1c1c1e;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #007aff;
+      background: #fff;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 17px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .btn-primary { background: #007aff; color: #fff; }
+    .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
+    .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+    .btn-success { background: #34c759; color: #fff; }
+    .btn-download { background: #5856d6; color: #fff; }
+
+    .slots-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
+    .slot-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #e5e5ea;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 14px;
+    }
+
+    .slot-chip button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      color: #6e6e73;
+      padding: 0 2px;
+      min-height: 0;
+    }
+
+    .add-slot-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .add-slot-row input { flex: 1; }
+    .add-slot-row button {
+      min-height: 44px;
+      padding: 0 16px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #007aff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .subtask-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .subtask-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .subtask-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: #007aff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: #ff3b30;
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .error-box {
+      background: #fff2f2;
+      border: 1px solid #ffb3b3;
+      border-radius: 8px;
+      padding: 12px;
+      color: #c0392b;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .instructions {
+      background: #f0f8ff;
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .instructions h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #007aff;
+    }
+
+    .instructions ol {
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #3a3a3c;
+    }
+
+    .hidden { display: none !important; }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .section-sub {
+      font-size: 13px;
+      color: #6e6e73;
+      margin-bottom: 16px;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: #007aff;
+      font-size: 15px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      min-height: 44px;
+      line-height: 44px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- STATE 1: Input Form -->
+<div id="state1">
+  <h1>TaskSync</h1>
+  <p class="subtitle">Turn any goal into a calendar</p>
+
+  <div class="card">
+    <label>API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
+
+    <label>API Base URL</label>
+    <input type="url" id="baseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
+
+    <label>Your Main Task</label>
+    <textarea id="taskInput" placeholder="e.g. Learn Spanish to conversational level"></textarea>
+
+    <label>Duration (weeks)</label>
+    <select id="weeksInput">
+      <option value="1">1 week</option>
+      <option value="2" selected>2 weeks</option>
+      <option value="4">4 weeks</option>
+      <option value="8">8 weeks</option>
+      <option value="12">12 weeks</option>
+    </select>
+
+    <label>Start Date</label>
+    <input type="date" id="startDate">
+
+    <label>Daily Time Slots</label>
+    <div class="slots-row" id="slotsContainer"></div>
+    <div class="add-slot-row">
+      <input type="time" id="newSlotTime" value="09:00">
+      <button onclick="addSlot()">+ Add</button>
+    </div>
+  </div>
+
+  <div id="error1" class="error-box hidden"></div>
+
+  <button class="btn btn-primary" id="decomposeBtn" onclick="decompose()">
+    Generate Subtasks
+  </button>
+</div>
+
+<!-- STATE 2: Review Subtasks -->
+<div id="state2" class="hidden">
+  <span class="back-link" onclick="goBack(1)">&#8592; Back</span>
+  <div class="section-title">Review Subtasks</div>
+  <p class="section-sub">Edit, reorder, or delete tasks before scheduling.</p>
+
+  <div id="subtasksContainer"></div>
+
+  <button class="btn btn-secondary" style="margin-bottom:10px" onclick="addSubtask()">+ Add Subtask</button>
+
+  <div id="error2" class="error-box hidden"></div>
+
+  <button class="btn btn-success" id="generateBtn" onclick="generateIcs()">
+    Generate Calendar (.ics)
+  </button>
+</div>
+
+<!-- STATE 3: Download -->
+<div id="state3" class="hidden">
+  <span class="back-link" onclick="goBack(2)">&#8592; Back</span>
+  <div class="section-title">Ready to Import</div>
+  <p class="section-sub">Your calendar file is ready.</p>
+
+  <div class="card" style="text-align:center; padding: 32px 20px;">
+    <div style="font-size:48px; margin-bottom:12px;">&#128197;</div>
+    <p style="font-size:16px; margin-bottom:20px; color:#3a3a3c;">
+      Tap the button below to download your <strong>.ics</strong> file.
+    </p>
+    <a id="downloadLink" class="btn btn-download" href="#" download>
+      Download .ics File
+    </a>
+  </div>
+
+  <div class="instructions">
+    <h3>Import to Apple Calendar (iOS)</h3>
+    <ol>
+      <li>Tap "Download .ics File" above</li>
+      <li>In the share sheet, tap <strong>Open in Calendar</strong></li>
+      <li>Tap <strong>Add All</strong> to import all events</li>
+      <li>Open Calendar app to see your schedule</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  // App state
+  let slots = ["09:00"];
+  let currentSubtasks = [];
+  let formData = {};
+  let apiKeyMem = "";
+
+  // Init
+  (function init() {
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("startDate").value = today;
+    renderSlots();
+  })();
+
+  function renderSlots() {
+    const container = document.getElementById("slotsContainer");
+    container.innerHTML = slots.map((s, i) => `
+      <div class="slot-chip">
+        ${s}
+        <button onclick="removeSlot(${i})" aria-label="Remove ${s}">&#215;</button>
+      </div>
+    `).join("");
+  }
+
+  function addSlot() {
+    const val = document.getElementById("newSlotTime").value;
+    if (val && !slots.includes(val)) {
+      slots.push(val);
+      slots.sort();
+      renderSlots();
+    }
+  }
+
+  function removeSlot(i) {
+    if (slots.length > 1) {
+      slots.splice(i, 1);
+      renderSlots();
+    }
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  }
+
+  function hideError(id) {
+    document.getElementById(id).classList.add("hidden");
+  }
+
+  function setState(n) {
+    [1, 2, 3].forEach(i => {
+      document.getElementById("state" + i).classList.toggle("hidden", i !== n);
+    });
+  }
+
+  function goBack(n) {
+    setState(n);
+  }
+
+  async function decompose() {
+    hideError("error1");
+    const apiKey = document.getElementById("apiKey").value.trim();
+    const baseUrl = document.getElementById("baseUrl").value.trim();
+    const task = document.getElementById("taskInput").value.trim();
+    const weeks = parseInt(document.getElementById("weeksInput").value);
+    const startDate = document.getElementById("startDate").value;
+
+    if (!apiKey) return showError("error1", "Please enter your API key.");
+    if (!task) return showError("error1", "Please describe your main task.");
+    if (!startDate) return showError("error1", "Please select a start date.");
+
+    apiKeyMem = apiKey;
+    formData = { base_url: baseUrl, task, weeks, start_date: startDate, daily_slots: [...slots] };
+
+    const btn = document.getElementById("decomposeBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Generating...';
+
+    try {
+      const res = await fetch("/api/decompose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKeyMem, ...formData }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Unknown error");
+
+      currentSubtasks = json.subtasks;
+      // Clear API key from memory after use
+      apiKeyMem = "";
+      document.getElementById("apiKey").value = "";
+
+      renderSubtasks();
+      setState(2);
+    } catch (e) {
+      showError("error1", "Error: " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Generate Subtasks";
+    }
+  }
+
+  function renderSubtasks() {
+    const container = document.getElementById("subtasksContainer");
+    container.innerHTML = currentSubtasks.map((s, i) => `
+      <div class="subtask-card" id="subtask-${i}">
+        <div class="card-header">
+          <span class="subtask-num">Task ${i + 1}</span>
+          <button class="delete-btn" onclick="deleteSubtask(${i})" aria-label="Delete task ${i+1}">&#215;</button>
+        </div>
+        <label>Title</label>
+        <input type="text" value="${escHtml(s.title)}" oninput="updateSubtask(${i},'title',this.value)">
+        <label>Description</label>
+        <textarea oninput="updateSubtask(${i},'description',this.value)">${escHtml(s.description)}</textarea>
+        <div class="row-2">
+          <div>
+            <label>Duration (min)</label>
+            <select onchange="updateSubtask(${i},'duration_minutes',parseInt(this.value))">
+              ${[15,30,45,60].map(v => `<option value="${v}" ${s.duration_minutes==v?'selected':''}>${v} min</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Day Offset</label>
+            <input type="number" min="0" value="${s.suggested_day_offset}" oninput="updateSubtask(${i},'suggested_day_offset',parseInt(this.value)||0)">
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function escHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function updateSubtask(i, field, value) {
+    currentSubtasks[i][field] = value;
+  }
+
+  function deleteSubtask(i) {
+    currentSubtasks.splice(i, 1);
+    renderSubtasks();
+  }
+
+  function addSubtask() {
+    currentSubtasks.push({
+      title: "New Task",
+      description: "",
+      duration_minutes: 30,
+      suggested_day_offset: 0,
+    });
+    renderSubtasks();
+    // Scroll to new card
+    const cards = document.querySelectorAll(".subtask-card");
+    cards[cards.length - 1].scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function generateIcs() {
+    hideError("error2");
+    if (currentSubtasks.length === 0) {
+      return showError("error2", "Add at least one subtask.");
+    }
+
+    const btn = document.getElementById("generateBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Generating...';
+
+    try {
+      const res = await fetch("/api/generate-ics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subtasks: currentSubtasks,
+          start_date: formData.start_date,
+          daily_slots: formData.daily_slots,
+          task_title: formData.task,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error || "Unknown error");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.getElementById("downloadLink");
+      link.href = url;
+
+      const safeName = (formData.task || "tasks").replace(/[^a-z0-9]/gi, "_").slice(0, 40);
+      link.download = safeName + ".ics";
+
+      setState(3);
+    } catch (e) {
+      showError("error2", "Error: " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Generate Calendar (.ics)";
+    }
+  }
+</script>
+</body>
+</html>
