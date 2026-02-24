@@ -288,12 +288,15 @@
         ` : ""}
         ${sources ? `<div class="sources-list">📎 来源（AI 生成引用）：<br>${sources}</div>` : ""}
         <div class="result-actions">
-          ${isDone
-            ? `<span class="${r.status === 'applied' ? 'status-applied' : 'status-rejected'}">${r.status === 'applied' ? '✅ 已采纳' : '✗ 已忽略'}</span>`
-            : hasFix
-              ? `<button class="btn-sm btn-approve" onclick="decide('${r.id}', 'approve')">采纳修改</button>
-                 <button class="btn-sm btn-reject" onclick="decide('${r.id}', 'reject')">忽略</button>`
-              : `<button class="btn-sm btn-reject" onclick="decide('${r.id}', 'reject')">标记已处理</button>`
+          ${r.status === 'applied'
+            ? `<span class="status-applied">✅ 已采纳</span>
+               ${'original_content' in r ? `<button class="btn-sm btn-reject" onclick="decide('${r.id}', 'undo')">撤销</button>` : ''}`
+            : r.status === 'rejected'
+              ? `<span class="status-rejected">✗ 已忽略</span>`
+              : hasFix
+                ? `<button class="btn-sm btn-approve" onclick="decide('${r.id}', 'approve')">采纳修改</button>
+                   <button class="btn-sm btn-reject" onclick="decide('${r.id}', 'reject')">忽略</button>`
+                : `<button class="btn-sm btn-reject" onclick="decide('${r.id}', 'reject')">标记已处理</button>`
           }
         </div>
       </div>`;

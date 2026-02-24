@@ -307,8 +307,8 @@ def api_validate_decide():
     data = request.get_json(force=True)
     result_id = data.get("result_id", "").strip()
     decision = data.get("decision", "").strip()
-    if decision not in ("approve", "reject"):
-        return jsonify({"error": "decision must be approve or reject"}), 400
+    if decision not in ("approve", "reject", "undo"):
+        return jsonify({"error": "decision must be approve, reject, or undo"}), 400
     store = ks.load_validation()
     target = next((r for r in store["results"] if r["id"] == result_id), None)
     if not target:
@@ -316,8 +316,17 @@ def api_validate_decide():
     if decision == "approve":
         correction = target.get("suggested_correction")
         if correction:
+            current = ks.get_entry(target["entry_id"])
+            if current:
+                target["original_content"] = current.get("content", "")
             ks.apply_correction(target["entry_id"], correction)
         target["status"] = "applied"
+    elif decision == "undo":
+        original = target.get("original_content")
+        if original is not None:
+            ks.apply_correction(target["entry_id"], original)
+        target["status"] = "pending_review"
+        target.pop("original_content", None)
     else:
         target["status"] = "rejected"
     ks.save_validation(store)
