@@ -1,0 +1,149 @@
+# TaskSync
+
+个人效率工具集，目前包含两个模块：**任务日历生成器** 和 **知识库**（含知识图谱、技能树、知识校验）。
+
+基于 Flask + 纯 HTML/CSS/JS，无前端框架依赖，可本地运行或部署到 Render。
+
+---
+
+## 功能模块
+
+### 任务日历生成器（`/`）
+
+输入一个目标，AI 自动拆解为子任务并生成 `.ics` 日历文件，可直接导入 Apple Calendar / Google Calendar。
+
+- 填写目标描述、周期（1/2/4/8/12 周）、开始日期、每日时间槽
+- 调用 OpenAI 兼容 API 拆解为带时长和日期偏移的子任务列表
+- 可手动编辑、增删子任务；支持 ▲▼ 按钮调整子任务顺序
+- 日期偏移超出计划天数时橙色边框提示
+- 时间槽格式和值域校验（HH:MM，0-23/0-59）
+- 生成 `.ics` 文件下载
+
+### 知识库（`/knowledge`）
+
+沉淀个人经验，支持全文搜索和 AI 辅助录入。
+
+**条目类型：** Bug 解决方案 / 经验总结 / 技巧 / 技术笔记 / 命令·CLI / 链接资源
+
+**核心功能：**
+- 创建、编辑、删除、复制条目（标题、正文、摘要、来源链接、标签）
+- 按类型 chip 过滤；标签云快速过滤（Top 15 高频标签）
+- 全文搜索（标题 + 正文 + 摘要 + 标签），300ms 防抖，关键词高亮
+- 排序切换：按创建时间 / 更新时间
+- 正文 Markdown 渲染（详情页）
+- AI 自动提取摘要、标签、建议类型（OpenAI 兼容 API）
+- JSON 导出 / 导入备份（支持 merge 模式，跳过重复条目）
+- 数据存储于本地 `data/knowledge.json`，原子写入防止文件损坏
+
+### 知识图谱（`/knowledge/graph`）
+
+AI 分析所有条目，自动聚类并发现条目间关联。
+
+- 按主题聚类，每个簇展示标签和所含条目（可折叠）
+- 关联关系表：扩展 / 相关 / 前置 / 矛盾，带彩色标签
+- 结果持久化到 `data/knowledge_graph.json`，可随时重新生成
+
+### 技能树（`/knowledge/skills`）
+
+从知识库内容中提炼技能图谱，发现学习盲区。
+
+- 已掌握技能：按语言 / 框架 / 工具 / 概念 / 领域分组，显示熟练度和来源条目
+- 推荐学习：AI 推荐 5-10 个互补技能，附推荐理由和父技能关联
+- 结果持久化到 `data/skill_tree.json`
+
+### 知识校验（`/knowledge/validate`）
+
+手动选择条目，AI 核查事实准确性，用户审核后决定是否采纳修正。
+
+- 勾选要校验的条目（建议每次 ≤10 条）
+- AI 两阶段处理：先判断是否含可核实事实，再给出 正确 / 已过时 / 有误 / 无法核实 四种裁定
+- 有问题的条目显示具体问题描述、建议修正内容和 AI 生成引用
+- 点击「采纳修改」直接更新条目正文；「忽略」标记跳过
+- 结果持久化到 `data/validation_results.json`
+
+---
+
+## 本地运行
+
+```bash
+pip install -r requirements.txt
+python app.py
+# 访问 http://localhost:5000
+```
+
+**API 填写说明：**
+- API Key：你的 key（支持 OpenAI 兼容中转服务）
+- API Base URL：`https://你的域名/v1`（结尾是 `/v1`，不带 `/messages`）
+- Model Name：服务商控制台里的可用模型名，如 `claude-sonnet-4-5`
+
+---
+
+## 项目结构
+
+```
+TaskSync/
+├── app.py                  # Flask 路由
+├── task_decomposer.py      # AI 任务拆解
+├── calendar_generator.py   # .ics 生成
+├── knowledge_store.py      # 知识库 JSON 存储层
+├── knowledge_ai.py         # AI：条目分析
+├── knowledge_graph_ai.py   # AI：知识图谱生成
+├── skill_tree_ai.py        # AI：技能树生成
+├── validation_ai.py        # AI：知识校验
+├── templates/
+│   ├── index.html          # 任务日历页面
+│   ├── knowledge.html      # 知识库主页
+│   ├── knowledge_graph.html # 知识图谱页面
+│   ├── skill_tree.html     # 技能树页面
+│   └── validation.html     # 知识校验页面
+├── data/                   # 运行时生成，已 gitignore
+│   ├── knowledge.json
+│   ├── knowledge_graph.json
+│   ├── skill_tree.json
+│   └── validation_results.json
+├── requirements.txt
+├── Procfile
+└── render.yaml
+```
+
+---
+
+## 部署到 Render
+
+1. 在 GitHub 创建仓库并推送代码
+2. 登录 [render.com](https://render.com) → New Web Service → 连接仓库
+3. Render 自动读取 `render.yaml`，点击 Deploy
+
+> 免费套餐 15 分钟无请求后休眠，首次唤醒约 30 秒。
+>
+> 注意：知识库数据存在本地文件，Render 免费套餐磁盘不持久化，重新部署后数据会丢失。生产使用建议接入外部数据库（见待办）。
+
+---
+
+## 依赖
+
+| 包 | 版本 | 用途 |
+|----|------|------|
+| flask | 3.0.3 | Web 框架 |
+| openai | 1.30.5 | AI API 客户端 |
+| httpx | 0.27.2 | HTTP 客户端（锁定版本避免 proxies 兼容问题） |
+| icalendar | 5.0.12 | .ics 文件生成 |
+| python-dateutil | 2.9.0 | 日期处理 |
+| gunicorn | 22.0.0 | 生产服务器 |
+
+---
+
+## 待办
+
+- [ ] **知识库持久化**：Render 免费磁盘不持久，考虑接入 SQLite（挂载卷）或 PostgreSQL
+- [x] **知识库导出**：支持导出为 JSON 备份文件，支持导入（merge 模式）
+- [x] **标签云**：在知识库列表页展示高频标签，点击快速过滤
+- [x] **条目排序**：支持按更新时间 / 创建时间切换排序
+- [x] **Markdown 渲染**：知识库正文支持 Markdown 预览
+- [x] **知识图谱**：AI 聚类 + 条目关联关系可视化
+- [x] **技能树**：从知识库提炼已掌握技能，推荐学习方向
+- [x] **知识校验**：AI 核查事实，用户审核后采纳或忽略修正
+- [ ] **部署验证**：推送到 GitHub 并完成 Render 首次部署
+- [ ] **移动端优化**：知识库详情页长文本的滚动体验
+- [ ] **知识库搜索增强**：支持多标签组合过滤
+- [ ] **批量操作**：批量删除 / 导出选中条目

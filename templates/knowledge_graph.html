@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>知识图谱 — TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; padding: 16px; }
+    h1 { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    label { display: block; font-size: 13px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; margin-top: 14px; }
+    label:first-child { margin-top: 0; }
+    input { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px; background: #f9f9fb; color: #1c1c1e; }
+    input:focus { outline: none; border-color: #007aff; background: #fff; }
+    .btn { display: block; width: 100%; min-height: 44px; padding: 12px 16px; font-size: 17px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; }
+    .btn-primary { background: #007aff; color: #fff; }
+    .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
+    .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+    .error-box { background: #fff2f2; border: 1px solid #ffb3b3; border-radius: 8px; padding: 12px; color: #c0392b; font-size: 14px; margin-bottom: 12px; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+    .back-link { display: inline-block; color: #007aff; font-size: 15px; margin-bottom: 16px; cursor: pointer; min-height: 44px; line-height: 44px; text-decoration: none; }
+    .ai-section { border: 1px solid #d1d1d6; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+    .ai-toggle { width: 100%; background: #f9f9fb; border: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: #007aff; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+    .ai-body { padding: 14px 16px; background: #fff; }
+    .section-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+    /* Cluster accordion */
+    .cluster-card { background: #fff; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+    .cluster-header { padding: 14px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .cluster-label { font-size: 16px; font-weight: 700; }
+    .cluster-theme { font-size: 13px; color: #6e6e73; margin-top: 2px; }
+    .cluster-count { font-size: 13px; color: #aeaeb2; white-space: nowrap; margin-left: 8px; }
+    .cluster-body { padding: 0 16px 14px; border-top: 1px solid #f2f2f7; }
+    .entry-link { display: block; padding: 8px 0; font-size: 14px; color: #007aff; text-decoration: none; border-bottom: 1px solid #f2f2f7; }
+    .entry-link:last-child { border-bottom: none; }
+    /* Relationships table */
+    .rel-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .rel-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #6e6e73; text-transform: uppercase; border-bottom: 1px solid #e5e5ea; }
+    .rel-table td { padding: 10px; border-bottom: 1px solid #f2f2f7; vertical-align: middle; }
+    .rel-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; }
+    .rel-extends { background: #e5f0ff; color: #0055cc; }
+    .rel-related { background: #e5ffe9; color: #1a7a2e; }
+    .rel-prerequisite { background: #fff8e5; color: #8a6000; }
+    .rel-contradicts { background: #ffe5e5; color: #c0392b; }
+    .empty-state { text-align: center; padding: 48px 16px; color: #aeaeb2; font-size: 15px; }
+    .loading-state { text-align: center; padding: 48px 16px; color: #6e6e73; font-size: 15px; }
+    .spinner-dark { display: inline-block; width: 20px; height: 20px; border: 2px solid #d1d1d6; border-top-color: #007aff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="/knowledge">← 返回知识库</a>
+<h1>🗺️ 知识图谱</h1>
+<p class="subtitle">AI 自动聚类，发现知识关联</p>
+
+<!-- AI Config -->
+<div class="ai-section">
+  <button class="ai-toggle" onclick="toggleAi()" id="aiToggleBtn">
+    <span>⚙️ AI 配置</span>
+    <span id="aiArrow">▼</span>
+  </button>
+  <div id="aiBody" class="ai-body hidden">
+    <label style="margin-top:0">API Key</label>
+    <input type="password" id="aiApiKey" placeholder="sk-…" autocomplete="off">
+    <label>API Base URL（可选）</label>
+    <input type="url" id="aiBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
+    <label>模型</label>
+    <input type="text" id="aiModel" value="claude-sonnet-4-5">
+  </div>
+</div>
+
+<div id="buildError" class="error-box hidden"></div>
+<button class="btn btn-primary" id="buildBtn" onclick="buildGraph()">生成知识图谱</button>
+
+<!-- STATE: empty -->
+<div id="stateEmpty" style="margin-top:24px">
+  <div class="empty-state">尚未生成图谱，点击上方按钮开始分析</div>
+</div>
+
+<!-- STATE: building -->
+<div id="stateBuilding" class="hidden" style="margin-top:24px">
+  <div class="loading-state"><span class="spinner-dark"></span>正在分析知识关联，请稍候…</div>
+</div>
+
+<!-- STATE: graph -->
+<div id="stateGraph" class="hidden" style="margin-top:24px">
+  <div class="section-title">📦 知识聚类</div>
+  <div id="clustersContainer"></div>
+
+  <div class="section-title" style="margin-top:24px">🔗 条目关联</div>
+  <div class="card" id="relCard">
+    <table class="rel-table">
+      <thead><tr><th>条目 A</th><th>关系</th><th>条目 B</th></tr></thead>
+      <tbody id="relBody"></tbody>
+    </table>
+    <div id="relEmpty" class="hidden" style="color:#aeaeb2;font-size:14px;padding:12px 0">暂无关联关系</div>
+  </div>
+</div>
+
+<script>
+  let aiOpen = false;
+  let graphData = null;
+  let entryMap = {};
+
+  init();
+
+  async function init() {
+    // Load existing graph
+    const res = await fetch("/api/knowledge/graph");
+    const data = await res.json();
+    if (data.clusters && data.clusters.length) {
+      graphData = data;
+      await loadEntryMap();
+      showGraph();
+    }
+    // Load entry map for links
+    await loadEntryMap();
+  }
+
+  async function loadEntryMap() {
+    const res = await fetch("/api/knowledge");
+    const entries = await res.json();
+    entryMap = {};
+    entries.forEach(e => { entryMap[e.id] = e; });
+  }
+
+  function toggleAi() {
+    aiOpen = !aiOpen;
+    document.getElementById("aiBody").classList.toggle("hidden", !aiOpen);
+    document.getElementById("aiArrow").textContent = aiOpen ? "▲" : "▼";
+  }
+
+  async function buildGraph() {
+    const apiKey = document.getElementById("aiApiKey").value.trim();
+    const baseUrl = document.getElementById("aiBaseUrl").value.trim();
+    const model = document.getElementById("aiModel").value.trim() || "claude-sonnet-4-5";
+    const errEl = document.getElementById("buildError");
+    errEl.classList.add("hidden");
+
+    if (!apiKey) { errEl.textContent = "请填写 API Key"; errEl.classList.remove("hidden"); return; }
+
+    const btn = document.getElementById("buildBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateGraph").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.remove("hidden");
+
+    try {
+      const res = await fetch("/api/knowledge/graph/build", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "生成失败");
+      graphData = json;
+      document.getElementById("aiApiKey").value = "";
+      showGraph();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove("hidden");
+      document.getElementById("stateBuilding").classList.add("hidden");
+      document.getElementById("stateEmpty").classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "重新生成";
+    }
+  }
+
+  function showGraph() {
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.add("hidden");
+    document.getElementById("stateGraph").classList.remove("hidden");
+    renderClusters();
+    renderRelationships();
+  }
+
+  function renderClusters() {
+    const container = document.getElementById("clustersContainer");
+    const clusters = graphData.clusters || [];
+    if (!clusters.length) {
+      container.innerHTML = '<div class="empty-state">无聚类数据</div>';
+      return;
+    }
+    container.innerHTML = clusters.map((c, i) => {
+      const entries = (c.entry_ids || []).map(id => entryMap[id]).filter(Boolean);
+      return `
+        <div class="cluster-card">
+          <div class="cluster-header" onclick="toggleCluster(${i})">
+            <div>
+              <div class="cluster-label">${escHtml(c.label)}</div>
+              <div class="cluster-theme">${escHtml(c.theme)}</div>
+            </div>
+            <span class="cluster-count">${entries.length} 条 <span id="clusterArrow${i}">▼</span></span>
+          </div>
+          <div class="cluster-body hidden" id="clusterBody${i}">
+            ${entries.length ? entries.map(e =>
+              `<a class="entry-link" href="/knowledge#entry=${e.id}">${escHtml(e.title)}</a>`
+            ).join("") : '<div style="color:#aeaeb2;font-size:13px;padding:8px 0">无匹配条目</div>'}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  function toggleCluster(i) {
+    const body = document.getElementById("clusterBody" + i);
+    const arrow = document.getElementById("clusterArrow" + i);
+    const hidden = body.classList.toggle("hidden");
+    arrow.textContent = hidden ? "▼" : "▲";
+  }
+
+  function renderRelationships() {
+    const rels = graphData.relationships || [];
+    const tbody = document.getElementById("relBody");
+    const empty = document.getElementById("relEmpty");
+    if (!rels.length) {
+      tbody.innerHTML = "";
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+    const REL_LABELS = { extends: "扩展", related: "相关", prerequisite: "前置", contradicts: "矛盾" };
+    tbody.innerHTML = rels.map(r => {
+      const from = entryMap[r.from_id];
+      const to = entryMap[r.to_id];
+      const fromTitle = from ? escHtml(from.title) : escHtml(r.from_id);
+      const toTitle = to ? escHtml(to.title) : escHtml(r.to_id);
+      const fromLink = from ? `<a href="/knowledge#entry=${r.from_id}" style="color:#007aff">${fromTitle}</a>` : fromTitle;
+      const toLink = to ? `<a href="/knowledge#entry=${r.to_id}" style="color:#007aff">${toTitle}</a>` : toTitle;
+      const rel = r.relation || "related";
+      return `<tr>
+        <td>${fromLink}</td>
+        <td><span class="rel-badge rel-${rel}">${REL_LABELS[rel] || rel}</span></td>
+        <td>${toLink}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function escHtml(str) {
+    return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+</script>
+</body>
+</html>

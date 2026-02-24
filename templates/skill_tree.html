@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>技能树 — TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; padding: 16px; }
+    h1 { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    label { display: block; font-size: 13px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; margin-top: 14px; }
+    label:first-child { margin-top: 0; }
+    input { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px; background: #f9f9fb; color: #1c1c1e; }
+    input:focus { outline: none; border-color: #007aff; background: #fff; }
+    .btn { display: block; width: 100%; min-height: 44px; padding: 12px 16px; font-size: 17px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; }
+    .btn-primary { background: #007aff; color: #fff; }
+    .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
+    .error-box { background: #fff2f2; border: 1px solid #ffb3b3; border-radius: 8px; padding: 12px; color: #c0392b; font-size: 14px; margin-bottom: 12px; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+    .back-link { display: inline-block; color: #007aff; font-size: 15px; margin-bottom: 16px; cursor: pointer; min-height: 44px; line-height: 44px; text-decoration: none; }
+    .ai-section { border: 1px solid #d1d1d6; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+    .ai-toggle { width: 100%; background: #f9f9fb; border: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: #007aff; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+    .ai-body { padding: 14px 16px; background: #fff; }
+    .empty-state { text-align: center; padding: 48px 16px; color: #aeaeb2; font-size: 15px; }
+    .loading-state { text-align: center; padding: 48px 16px; color: #6e6e73; font-size: 15px; }
+    .spinner-dark { display: inline-block; width: 20px; height: 20px; border: 2px solid #d1d1d6; border-top-color: #007aff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    /* Two-column layout */
+    .skills-grid { display: flex; gap: 16px; }
+    .skills-col { flex: 1; min-width: 0; }
+    @media (max-width: 600px) { .skills-grid { flex-direction: column; } }
+    .col-title { font-size: 16px; font-weight: 700; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; }
+    .col-has { background: #e5ffe9; color: #1a7a2e; }
+    .col-missing { background: #e5f0ff; color: #0055cc; }
+    /* Category group */
+    .cat-group { margin-bottom: 12px; }
+    .cat-label { font-size: 12px; font-weight: 700; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    /* Skill card */
+    .skill-card { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); cursor: pointer; }
+    .skill-card:active { opacity: 0.8; }
+    .skill-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .skill-name { font-size: 15px; font-weight: 600; }
+    .level-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+    .level-beginner { background: #fff8e5; color: #8a6000; }
+    .level-intermediate { background: #e5f0ff; color: #0055cc; }
+    .level-advanced { background: #e5ffe9; color: #1a7a2e; }
+    .skill-detail { margin-top: 8px; font-size: 13px; color: #6e6e73; border-top: 1px solid #f2f2f7; padding-top: 8px; }
+    .evidence-link { display: inline-block; color: #007aff; font-size: 13px; margin-right: 6px; }
+  </style>
+</head>
+<body>
+
+<a class="back-link" href="/knowledge">← 返回知识库</a>
+<h1>🌳 技能树</h1>
+<p class="subtitle">从知识库中提炼技能，发现学习方向</p>
+
+<!-- AI Config -->
+<div class="ai-section">
+  <button class="ai-toggle" onclick="toggleAi()" id="aiToggleBtn">
+    <span>⚙️ AI 配置</span>
+    <span id="aiArrow">▼</span>
+  </button>
+  <div id="aiBody" class="ai-body hidden">
+    <label style="margin-top:0">API Key</label>
+    <input type="password" id="aiApiKey" placeholder="sk-…" autocomplete="off">
+    <label>API Base URL（可选）</label>
+    <input type="url" id="aiBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
+    <label>模型</label>
+    <input type="text" id="aiModel" value="claude-sonnet-4-5">
+  </div>
+</div>
+
+<div id="buildError" class="error-box hidden"></div>
+<button class="btn btn-primary" id="buildBtn" onclick="buildTree()">生成技能树</button>
+
+<!-- STATE: empty -->
+<div id="stateEmpty" style="margin-top:24px">
+  <div class="empty-state">尚未生成技能树，点击上方按钮开始分析</div>
+</div>
+
+<!-- STATE: building -->
+<div id="stateBuilding" class="hidden" style="margin-top:24px">
+  <div class="loading-state"><span class="spinner-dark"></span>正在分析技能分布，请稍候…</div>
+</div>
+
+<!-- STATE: tree -->
+<div id="stateTree" class="hidden" style="margin-top:24px">
+  <div class="skills-grid">
+    <div class="skills-col">
+      <div class="col-title col-has">✅ 已掌握</div>
+      <div id="hasSkills"></div>
+    </div>
+    <div class="skills-col">
+      <div class="col-title col-missing">📚 推荐学习</div>
+      <div id="missingSkills"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let aiOpen = false;
+  let treeData = null;
+  let entryMap = {};
+
+  init();
+
+  async function init() {
+    const res = await fetch("/api/knowledge/skill-tree");
+    const data = await res.json();
+    if (data.skills && data.skills.length) {
+      treeData = data;
+      await loadEntryMap();
+      showTree();
+    }
+    await loadEntryMap();
+  }
+
+  async function loadEntryMap() {
+    const res = await fetch("/api/knowledge");
+    const entries = await res.json();
+    entryMap = {};
+    entries.forEach(e => { entryMap[e.id] = e; });
+  }
+
+  function toggleAi() {
+    aiOpen = !aiOpen;
+    document.getElementById("aiBody").classList.toggle("hidden", !aiOpen);
+    document.getElementById("aiArrow").textContent = aiOpen ? "▲" : "▼";
+  }
+
+  async function buildTree() {
+    const apiKey = document.getElementById("aiApiKey").value.trim();
+    const baseUrl = document.getElementById("aiBaseUrl").value.trim();
+    const model = document.getElementById("aiModel").value.trim() || "claude-sonnet-4-5";
+    const errEl = document.getElementById("buildError");
+    errEl.classList.add("hidden");
+
+    if (!apiKey) { errEl.textContent = "请填写 API Key"; errEl.classList.remove("hidden"); return; }
+
+    const btn = document.getElementById("buildBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateTree").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.remove("hidden");
+
+    try {
+      const res = await fetch("/api/knowledge/skill-tree/build", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "生成失败");
+      treeData = json;
+      document.getElementById("aiApiKey").value = "";
+      showTree();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove("hidden");
+      document.getElementById("stateBuilding").classList.add("hidden");
+      document.getElementById("stateEmpty").classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "重新生成";
+    }
+  }
+
+  function showTree() {
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.add("hidden");
+    document.getElementById("stateTree").classList.remove("hidden");
+    renderSkills();
+  }
+
+  const CAT_LABELS = { language: "语言", framework: "框架", tool: "工具", concept: "概念", domain: "领域" };
+  const CAT_ORDER = ["language", "framework", "tool", "concept", "domain"];
+
+  function renderSkills() {
+    const skills = treeData.skills || [];
+    const hasSkills = skills.filter(s => s.status === "has");
+    const missingSkills = skills.filter(s => s.status === "missing");
+
+    document.getElementById("hasSkills").innerHTML = renderSkillGroup(hasSkills, true);
+    document.getElementById("missingSkills").innerHTML = renderSkillGroup(missingSkills, false);
+  }
+
+  function renderSkillGroup(skills, isHas) {
+    if (!skills.length) return '<div style="color:#aeaeb2;font-size:14px;padding:8px 0">暂无数据</div>';
+    // Group by category
+    const groups = {};
+    skills.forEach(s => {
+      const cat = s.category || "concept";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    });
+    return CAT_ORDER.filter(c => groups[c]).map(cat => `
+      <div class="cat-group">
+        <div class="cat-label">${CAT_LABELS[cat] || cat}</div>
+        ${groups[cat].map((s, i) => renderSkillCard(s, isHas, cat + i)).join("")}
+      </div>
+    `).join("");
+  }
+
+  function renderSkillCard(skill, isHas, uid) {
+    const levelBadge = skill.level ? `<span class="level-badge level-${skill.level}">${levelLabel(skill.level)}</span>` : "";
+    const evidenceLinks = isHas && skill.evidence_entry_ids && skill.evidence_entry_ids.length
+      ? skill.evidence_entry_ids.map(id => {
+          const e = entryMap[id];
+          return e ? `<a class="evidence-link" href="/knowledge#entry=${id}">${escHtml(e.title)}</a>` : "";
+        }).filter(Boolean).join("")
+      : "";
+    const reason = !isHas && skill.recommendation_reason
+      ? `<div>${escHtml(skill.recommendation_reason)}</div>` : "";
+    const parent = skill.parent_skill_id
+      ? `<div style="color:#aeaeb2">父技能: ${escHtml(skill.parent_skill_id)}</div>` : "";
+
+    return `
+      <div class="skill-card" onclick="toggleSkillDetail('detail_${uid}')">
+        <div class="skill-header">
+          <span class="skill-name">${escHtml(skill.name)}</span>
+          ${levelBadge}
+        </div>
+        <div class="skill-detail hidden" id="detail_${uid}">
+          ${evidenceLinks ? `<div style="margin-bottom:4px">${evidenceLinks}</div>` : ""}
+          ${reason}
+          ${parent}
+          ${!evidenceLinks && !reason && !parent ? '<div style="color:#aeaeb2">暂无详情</div>' : ""}
+        </div>
+      </div>`;
+  }
+
+  function toggleSkillDetail(id) {
+    document.getElementById(id).classList.toggle("hidden");
+  }
+
+  function levelLabel(l) {
+    return { beginner: "入门", intermediate: "中级", advanced: "高级" }[l] || l;
+  }
+
+  function escHtml(str) {
+    return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+</script>
+</body>
+</html>

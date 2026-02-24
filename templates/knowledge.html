@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>知识库 — TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f2f2f7;
+      color: #1c1c1e;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6e6e73;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+    label:first-child { margin-top: 0; }
+
+    input, textarea, select {
+      width: 100%;
+      font-size: 16px;
+      padding: 10px 12px;
+      border: 1px solid #d1d1d6;
+      border-radius: 8px;
+      background: #f9f9fb;
+      color: #1c1c1e;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    textarea { resize: vertical; min-height: 100px; }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #007aff;
+      background: #fff;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 17px;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    .btn-primary { background: #007aff; color: #fff; }
+    .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
+    .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+    .btn-danger { background: #ff3b30; color: #fff; }
+    .btn-sm {
+      display: inline-block;
+      width: auto;
+      min-height: 36px;
+      padding: 6px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .error-box {
+      background: #fff2f2;
+      border: 1px solid #ffb3b3;
+      border-radius: 8px;
+      padding: 12px;
+      color: #c0392b;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+
+    .back-link {
+      display: inline-block;
+      color: #007aff;
+      font-size: 15px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      min-height: 44px;
+      line-height: 44px;
+    }
+
+    /* Search bar */
+    .search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .search-row input { flex: 1; margin: 0; }
+
+    /* Type chips */
+    .chips-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      background: #e5e5ea;
+      color: #3a3a3c;
+      transition: background 0.15s;
+    }
+    .chip.active { background: #007aff; color: #fff; border-color: #007aff; }
+
+    /* Entry card */
+    .entry-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      cursor: pointer;
+    }
+    .entry-card:active { opacity: 0.8; }
+    .entry-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .entry-title { font-size: 16px; font-weight: 600; flex: 1; }
+    .type-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+    }
+    .type-bug      { background: #ffe5e5; color: #c0392b; }
+    .type-experience { background: #e5f0ff; color: #0055cc; }
+    .type-skill    { background: #e5ffe9; color: #1a7a2e; }
+    .type-note     { background: #fff8e5; color: #8a6000; }
+    .type-command  { background: #f0e5ff; color: #6600cc; }
+    .type-link     { background: #e5f9ff; color: #006688; }
+
+    .entry-summary { font-size: 13px; color: #6e6e73; margin-top: 6px; }
+    .entry-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .tag-pill {
+      font-size: 12px;
+      background: #f2f2f7;
+      color: #3a3a3c;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .entry-date { font-size: 11px; color: #aeaeb2; margin-top: 6px; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: #aeaeb2;
+      font-size: 15px;
+    }
+
+    /* Tag input */
+    .tag-input-row { display: flex; gap: 8px; margin-top: 8px; }
+    .tag-input-row input { flex: 1; }
+    .tag-input-row button {
+      min-height: 44px;
+      padding: 0 14px;
+      font-size: 15px;
+      font-weight: 600;
+      background: #007aff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tags-display { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag-editable {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #e5e5ea;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 13px;
+    }
+    .tag-editable button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 15px;
+      color: #6e6e73;
+      padding: 0 2px;
+      line-height: 1;
+    }
+
+    /* AI section */
+    .ai-section {
+      border: 1px solid #d1d1d6;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 14px;
+    }
+    .ai-toggle {
+      width: 100%;
+      background: #f9f9fb;
+      border: none;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #007aff;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ai-body { padding: 14px 16px; background: #fff; }
+
+    /* Detail view */
+    .detail-content {
+      font-size: 15px;
+      line-height: 1.7;
+      word-break: break-word;
+      color: #1c1c1e;
+    }
+    .detail-content h1, .detail-content h2, .detail-content h3 { font-weight: 700; margin: 14px 0 6px; }
+    .detail-content h1 { font-size: 20px; }
+    .detail-content h2 { font-size: 17px; }
+    .detail-content h3 { font-size: 15px; }
+    .detail-content p { margin: 8px 0; }
+    .detail-content ul, .detail-content ol { padding-left: 20px; margin: 8px 0; }
+    .detail-content code { background: #f2f2f7; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 13px; }
+    .detail-content pre { background: #f2f2f7; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
+    .detail-content pre code { background: none; padding: 0; }
+    .detail-content a { color: #007aff; }
+    .detail-content blockquote { border-left: 3px solid #d1d1d6; padding-left: 12px; color: #6e6e73; margin: 8px 0; }
+    .detail-meta { font-size: 12px; color: #aeaeb2; margin-top: 12px; }
+    .detail-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .detail-actions .btn { flex: 1; }
+
+    .source-link { color: #007aff; font-size: 14px; word-break: break-all; }
+
+    /* Tag cloud */
+    .tag-cloud-pill {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid #d1d1d6;
+      background: #fff;
+      color: #3a3a3c;
+      transition: background 0.15s;
+    }
+    .tag-cloud-pill.active { background: #34c759; color: #fff; border-color: #34c759; }
+
+    mark { background: #ffeb3b; color: inherit; border-radius: 2px; padding: 0 1px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+<!-- STATE: list -->
+<div id="stateList">
+  <h1>📚 知识库</h1>
+  <p class="subtitle">沉淀经验，随时检索</p>
+
+  <div class="search-row">
+    <input type="search" id="searchInput" placeholder="搜索标题、内容、标签…" oninput="onSearchInput()">
+    <button class="btn btn-primary btn-sm" onclick="showForm(null)" style="white-space:nowrap">+ 新建</button>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <button class="btn btn-secondary btn-sm" onclick="exportKnowledge()">导出 JSON</button>
+    <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center;">
+      导入 JSON
+      <input type="file" accept=".json" style="display:none" onchange="importKnowledge(this)">
+    </label>
+    <a href="/knowledge/graph" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">🗺️ 知识图谱</a>
+    <a href="/knowledge/skills" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">🌳 技能树</a>
+    <a href="/knowledge/validate" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">✅ 知识校验</a>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <span class="chip active" id="sortChip" onclick="toggleSort()">按创建时间</span>
+  </div>
+
+  <div id="tagCloud" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+
+  <div class="chips-row" id="typeChips"></div>
+
+  <div id="entriesList"></div>
+</div>
+
+<!-- STATE: form -->
+<div id="stateForm" class="hidden">
+  <span class="back-link" onclick="showList()">← 返回</span>
+  <div style="font-size:20px;font-weight:700;margin-bottom:16px;" id="formTitle">新建条目</div>
+
+  <div class="card">
+    <label>类型</label>
+    <select id="fType">
+      <option value="bug">🐛 Bug 解决方案</option>
+      <option value="experience">💡 经验总结</option>
+      <option value="skill">🔧 技巧</option>
+      <option value="note">📝 技术笔记</option>
+      <option value="command">⌨️ 命令 / CLI</option>
+      <option value="link">🔗 链接资源</option>
+    </select>
+
+    <label>标题</label>
+    <input type="text" id="fTitle" placeholder="简短描述这条知识">
+
+    <label>正文</label>
+    <textarea id="fContent" placeholder="详细内容、步骤、代码…" style="min-height:140px"></textarea>
+
+    <label>摘要（可选）</label>
+    <input type="text" id="fSummary" placeholder="一句话概括">
+
+    <label>来源链接（可选）</label>
+    <input type="url" id="fSourceUrl" placeholder="https://…">
+
+    <label>标签</label>
+    <div class="tags-display" id="fTagsDisplay"></div>
+    <div class="tag-input-row">
+      <input type="text" id="fTagInput" placeholder="输入标签后回车" onkeydown="onTagKeydown(event)">
+      <button onclick="addTag()">添加</button>
+    </div>
+
+    <div class="ai-section">
+      <button class="ai-toggle" onclick="toggleAi()" id="aiToggleBtn">
+        <span>✨ AI 自动提取（可选）</span>
+        <span id="aiArrow">▼</span>
+      </button>
+      <div id="aiBody" class="ai-body hidden">
+        <label style="margin-top:0">API Key</label>
+        <input type="password" id="aiApiKey" placeholder="sk-…" autocomplete="off">
+        <label>API Base URL（可选）</label>
+        <input type="url" id="aiBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
+        <label>模型</label>
+        <input type="text" id="aiModel" value="claude-sonnet-4-5">
+        <div id="aiError" class="error-box hidden" style="margin-top:10px"></div>
+        <button class="btn btn-primary btn-sm" id="aiBtn" onclick="runAi()" style="margin-top:12px;width:100%">
+          AI 自动提取
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="formError" class="error-box hidden"></div>
+
+  <button class="btn btn-primary" id="saveBtn" onclick="saveEntry()">保存</button>
+</div>
+
+<!-- STATE: detail -->
+<div id="stateDetail" class="hidden">
+  <span class="back-link" onclick="showList()">← 返回</span>
+
+  <div class="card">
+    <div class="entry-header">
+      <div class="entry-title" id="dTitle"></div>
+      <span class="type-badge" id="dTypeBadge"></span>
+    </div>
+    <div id="dSummary" class="entry-summary"></div>
+    <div class="entry-tags" id="dTags"></div>
+    <hr style="margin:14px 0; border:none; border-top:1px solid #f2f2f7">
+    <div class="detail-content" id="dContent"></div>
+    <div id="dSourceUrl" style="margin-top:10px"></div>
+    <div class="detail-meta" id="dMeta"></div>
+  </div>
+
+  <div class="detail-actions">
+    <button class="btn btn-secondary" onclick="editCurrent()">编辑</button>
+    <button class="btn btn-secondary" onclick="duplicateCurrent()">复制</button>
+    <button class="btn btn-danger" onclick="deleteCurrent()">删除</button>
+  </div>
+</div>
+
+<script>
+  const TYPES = ["bug","experience","skill","note","command","link"];
+  const TYPE_LABELS = {
+    bug:"Bug",experience:"经验",skill:"技巧",note:"笔记",command:"命令",link:"链接"
+  };
+
+  let allEntries = [];
+  let currentFilter = null;
+  let currentTagFilter = null;
+  let sortField = "created_at";
+  let currentEntry = null;
+  let editingId = null;
+  let formTags = [];
+  let searchTimer = null;
+  let aiOpen = false;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  renderTypeChips();
+  loadEntries().then(() => {
+    const hash = location.hash;
+    const m = hash.match(/^#entry=(.+)$/);
+    if (m) {
+      const entry = allEntries.find(e => e.id === m[1]);
+      if (entry) showDetail(entry.id);
+    }
+  });
+  loadTagCloud();
+
+  function renderTypeChips() {
+    const row = document.getElementById("typeChips");
+    const all = `<span class="chip ${currentFilter===null?'active':''}" onclick="setFilter(null)">全部</span>`;
+    const chips = TYPES.map(t =>
+      `<span class="chip ${currentFilter===t?'active':''}" onclick="setFilter('${t}')">${TYPE_LABELS[t]}</span>`
+    ).join("");
+    row.innerHTML = all + chips;
+  }
+
+  async function loadEntries() {
+    const q = document.getElementById("searchInput").value.trim();
+    const params = new URLSearchParams();
+    if (currentFilter) params.set("type", currentFilter);
+    if (currentTagFilter) params.set("tag", currentTagFilter);
+    if (q) params.set("q", q);
+    const res = await fetch("/api/knowledge?" + params);
+    allEntries = await res.json();
+    renderEntries();
+  }
+
+  function renderEntries() {
+    const q = document.getElementById("searchInput").value.trim();
+    const sorted = [...allEntries].sort((a, b) => {
+      const av = a[sortField] || "";
+      const bv = b[sortField] || "";
+      return bv.localeCompare(av);
+    });
+    const container = document.getElementById("entriesList");
+    if (!sorted.length) {
+      container.innerHTML = '<div class="empty-state">暂无条目，点击「+ 新建」开始记录</div>';
+      return;
+    }
+    container.innerHTML = sorted.map(e => `
+      <div class="entry-card" onclick="showDetail('${e.id}')">
+        <div class="entry-header">
+          <div class="entry-title">${highlightText(e.title, q)}</div>
+          <span class="type-badge type-${e.type}">${TYPE_LABELS[e.type]||e.type}</span>
+        </div>
+        ${e.summary ? `<div class="entry-summary">${highlightText(e.summary, q)}</div>` : ""}
+        ${e.tags && e.tags.length ? `<div class="entry-tags">${e.tags.map(t=>`<span class="tag-pill">${escHtml(t)}</span>`).join("")}</div>` : ""}
+        <div class="entry-date">${fmtDate(e.created_at)}</div>
+      </div>
+    `).join("");
+  }
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  function setFilter(type) {
+    currentFilter = type;
+    renderTypeChips();
+    loadEntries();
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadEntries, 300);
+  }
+
+  // ── State transitions ─────────────────────────────────────────────────────
+  function showList() {
+    document.getElementById("stateList").classList.remove("hidden");
+    document.getElementById("stateForm").classList.add("hidden");
+    document.getElementById("stateDetail").classList.add("hidden");
+    loadEntries();
+    loadTagCloud();
+  }
+
+  function showForm(entry) {
+    editingId = entry ? entry.id : null;
+    formTags = entry ? [...(entry.tags || [])] : [];
+    document.getElementById("formTitle").textContent = entry ? "编辑条目" : "新建条目";
+    document.getElementById("fType").value = entry ? entry.type : "note";
+    document.getElementById("fTitle").value = entry ? entry.title : "";
+    document.getElementById("fContent").value = entry ? entry.content : "";
+    document.getElementById("fSummary").value = entry ? (entry.summary || "") : "";
+    document.getElementById("fSourceUrl").value = entry ? (entry.source_url || "") : "";
+    document.getElementById("fTagInput").value = "";
+    document.getElementById("formError").classList.add("hidden");
+    renderFormTags();
+    // Reset AI section
+    aiOpen = false;
+    document.getElementById("aiBody").classList.add("hidden");
+    document.getElementById("aiArrow").textContent = "▼";
+    document.getElementById("aiApiKey").value = "";
+    document.getElementById("aiError").classList.add("hidden");
+
+    document.getElementById("stateList").classList.add("hidden");
+    document.getElementById("stateDetail").classList.add("hidden");
+    document.getElementById("stateForm").classList.remove("hidden");
+  }
+
+  function showDetail(id) {
+    const entry = allEntries.find(e => e.id === id);
+    if (!entry) return;
+    currentEntry = entry;
+    document.getElementById("dTitle").textContent = entry.title;
+    const badge = document.getElementById("dTypeBadge");
+    badge.textContent = TYPE_LABELS[entry.type] || entry.type;
+    badge.className = `type-badge type-${entry.type}`;
+    document.getElementById("dSummary").textContent = entry.summary || "";
+    document.getElementById("dSummary").style.display = entry.summary ? "" : "none";
+    document.getElementById("dTags").innerHTML = (entry.tags||[]).map(t=>`<span class="tag-pill">${escHtml(t)}</span>`).join("");
+    const contentEl = document.getElementById("dContent");
+    if (typeof marked !== "undefined") {
+      contentEl.innerHTML = marked.parse(entry.content || "");
+    } else {
+      contentEl.textContent = entry.content || "";
+    }
+    const srcEl = document.getElementById("dSourceUrl");
+    if (entry.source_url) {
+      srcEl.innerHTML = `<a class="source-link" href="${escHtml(entry.source_url)}" target="_blank" rel="noopener">${escHtml(entry.source_url)}</a>`;
+    } else {
+      srcEl.innerHTML = "";
+    }
+    document.getElementById("dMeta").textContent = `创建于 ${fmtDate(entry.created_at)}  ·  更新于 ${fmtDate(entry.updated_at)}`;
+
+    document.getElementById("stateList").classList.add("hidden");
+    document.getElementById("stateForm").classList.add("hidden");
+    document.getElementById("stateDetail").classList.remove("hidden");
+  }
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  function renderFormTags() {
+    document.getElementById("fTagsDisplay").innerHTML = formTags.map((t, i) =>
+      `<span class="tag-editable">${escHtml(t)}<button onclick="removeTag(${i})" aria-label="删除标签">×</button></span>`
+    ).join("");
+  }
+
+  function addTag() {
+    const input = document.getElementById("fTagInput");
+    const val = input.value.trim().toLowerCase();
+    if (val && !formTags.includes(val)) {
+      formTags.push(val);
+      renderFormTags();
+    }
+    input.value = "";
+    input.focus();
+  }
+
+  function removeTag(i) {
+    formTags.splice(i, 1);
+    renderFormTags();
+  }
+
+  function onTagKeydown(e) {
+    if (e.key === "Enter") { e.preventDefault(); addTag(); }
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  async function saveEntry() {
+    const title = document.getElementById("fTitle").value.trim();
+    const type = document.getElementById("fType").value;
+    if (!title) {
+      const el = document.getElementById("formError");
+      el.textContent = "标题不能为空";
+      el.classList.remove("hidden");
+      return;
+    }
+    document.getElementById("formError").classList.add("hidden");
+
+    const payload = {
+      type,
+      title,
+      content: document.getElementById("fContent").value,
+      summary: document.getElementById("fSummary").value.trim(),
+      source_url: document.getElementById("fSourceUrl").value.trim(),
+      tags: formTags,
+    };
+
+    const btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>保存中…';
+
+    try {
+      let res;
+      if (editingId) {
+        res = await fetch(`/api/knowledge/${editingId}`, {
+          method: "PUT",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch("/api/knowledge", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload),
+        });
+      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "保存失败");
+      showList();
+    } catch (e) {
+      const el = document.getElementById("formError");
+      el.textContent = e.message;
+      el.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "保存";
+    }
+  }
+
+  // ── Detail actions ────────────────────────────────────────────────────────
+  function editCurrent() {
+    if (currentEntry) showForm(currentEntry);
+  }
+
+  async function deleteCurrent() {
+    if (!currentEntry) return;
+    if (!confirm(`确认删除「${currentEntry.title}」？`)) return;
+    const res = await fetch(`/api/knowledge/${currentEntry.id}`, { method: "DELETE" });
+    if (res.ok) {
+      currentEntry = null;
+      showList();
+    }
+  }
+
+  // ── AI ────────────────────────────────────────────────────────────────────
+  function toggleAi() {
+    aiOpen = !aiOpen;
+    document.getElementById("aiBody").classList.toggle("hidden", !aiOpen);
+    document.getElementById("aiArrow").textContent = aiOpen ? "▲" : "▼";
+  }
+
+  async function runAi() {
+    const apiKey = document.getElementById("aiApiKey").value.trim();
+    const baseUrl = document.getElementById("aiBaseUrl").value.trim();
+    const model = document.getElementById("aiModel").value.trim() || "claude-sonnet-4-5";
+    const title = document.getElementById("fTitle").value.trim();
+    const content = document.getElementById("fContent").value.trim();
+    const errEl = document.getElementById("aiError");
+    errEl.classList.add("hidden");
+
+    if (!apiKey) { errEl.textContent = "请填写 API Key"; errEl.classList.remove("hidden"); return; }
+    if (!title && !content) { errEl.textContent = "请先填写标题或正文"; errEl.classList.remove("hidden"); return; }
+
+    const btn = document.getElementById("aiBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+
+    try {
+      const res = await fetch("/api/knowledge/analyze", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model, title, content }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "AI 分析失败");
+
+      if (json.summary) document.getElementById("fSummary").value = json.summary;
+      if (json.suggested_type) document.getElementById("fType").value = json.suggested_type;
+      if (json.tags && json.tags.length) {
+        json.tags.forEach(t => { if (!formTags.includes(t)) formTags.push(t); });
+        renderFormTags();
+      }
+      // Clear API key
+      document.getElementById("aiApiKey").value = "";
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "AI 自动提取";
+    }
+  }
+
+  // ── Tag cloud ─────────────────────────────────────────────────────────────
+  async function loadTagCloud() {
+    const res = await fetch("/api/knowledge/tags");
+    const tags = await res.json();
+    const top15 = tags.slice(0, 15);
+    const cloud = document.getElementById("tagCloud");
+    if (!top15.length) { cloud.innerHTML = ""; return; }
+    cloud.innerHTML = top15.map(t =>
+      `<span class="tag-cloud-pill ${currentTagFilter === t.tag ? 'active' : ''}" data-tag="${escHtml(t.tag)}">${escHtml(t.tag)} <small>${t.count}</small></span>`
+    ).join("");
+    cloud.querySelectorAll(".tag-cloud-pill").forEach(el => {
+      el.addEventListener("click", () => setTagFilter(el.dataset.tag));
+    });
+  }
+
+  function setTagFilter(tag) {
+    currentTagFilter = currentTagFilter === tag ? null : tag;
+    loadTagCloud();
+    loadEntries();
+  }
+
+  function toggleSort() {
+    sortField = sortField === "created_at" ? "updated_at" : "created_at";
+    document.getElementById("sortChip").textContent = sortField === "created_at" ? "按创建时间" : "按更新时间";
+    renderEntries();
+  }
+
+  // ── Duplicate ─────────────────────────────────────────────────────────────
+  async function duplicateCurrent() {
+    if (!currentEntry) return;
+    const payload = {
+      type: currentEntry.type,
+      title: currentEntry.title + " (副本)",
+      content: currentEntry.content || "",
+      summary: currentEntry.summary || "",
+      source_url: currentEntry.source_url || "",
+      tags: [...(currentEntry.tags || [])],
+    };
+    const res = await fetch("/api/knowledge", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) showList();
+  }
+
+  // ── Export / Import ───────────────────────────────────────────────────────
+  function exportKnowledge() {
+    window.location.href = "/api/knowledge/export";
+  }
+
+  async function importKnowledge(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/knowledge/import?mode=merge", { method: "POST", body: fd });
+    const json = await res.json();
+    if (res.ok) {
+      alert(`导入完成：新增 ${json.added} 条，跳过 ${json.skipped} 条`);
+    } else {
+      alert("导入失败：" + (json.error || "未知错误"));
+    }
+    input.value = "";
+    loadEntries();
+    loadTagCloud();
+  }
+
+  // ── Utils ─────────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str || "")
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function highlightText(text, q) {
+    const escaped = escHtml(text);
+    if (!q) return escaped;
+    const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+    return escaped.replace(re, "<mark>$1</mark>");
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("zh-CN", { year:"numeric", month:"2-digit", day:"2-digit" });
+  }
+</script>
+</body>
+</html>

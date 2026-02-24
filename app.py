@@ -1,11 +1,18 @@
+import json
 import logging
 import os
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 
 from flask import Flask, jsonify, render_template, request, Response
 
 from calendar_generator import generate_ics
 from task_decomposer import decompose_task
+import knowledge_store as ks
+from knowledge_ai import analyze_entry
+from knowledge_graph_ai import build_knowledge_graph
+from skill_tree_ai import build_skill_tree
+from validation_ai import validate_entries
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -60,6 +67,14 @@ def api_generate_ics():
     if not subtasks:
         return jsonify({"error": "subtasks are required"}), 400
 
+    _SLOT_RE = re.compile(r"^\d{2}:\d{2}$")
+    for slot in daily_slots:
+        if not _SLOT_RE.match(str(slot)):
+            return jsonify({"error": f"Invalid time slot format: {slot}"}), 400
+        h, m = int(slot[:2]), int(slot[3:])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            return jsonify({"error": f"Time slot out of range: {slot}"}), 400
+
     try:
         start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -81,6 +96,232 @@ def api_generate_ics():
             "Content-Type": "text/calendar; charset=utf-8",
         },
     )
+
+
+@app.route("/knowledge")
+def knowledge_page():
+    return render_template("knowledge.html")
+
+
+@app.route("/api/knowledge/tags", methods=["GET"])
+def api_knowledge_tags():
+    return jsonify(ks.get_all_tags())
+
+
+@app.route("/api/knowledge", methods=["GET"])
+def api_knowledge_list():
+    type_filter = request.args.get("type", "").strip() or None
+    tag = request.args.get("tag", "").strip()
+    tags = [tag] if tag else None
+    q = request.args.get("q", "").strip() or None
+    return jsonify(ks.list_entries(type_filter, tags, q))
+
+
+@app.route("/api/knowledge", methods=["POST"])
+def api_knowledge_create():
+    data = request.get_json(force=True)
+    if not data.get("title", "").strip():
+        return jsonify({"error": "title is required"}), 400
+    if not data.get("type", "").strip():
+        return jsonify({"error": "type is required"}), 400
+    entry = ks.create_entry(data)
+    return jsonify(entry), 201
+
+
+@app.route("/api/knowledge/<entry_id>", methods=["PUT"])
+def api_knowledge_update(entry_id):
+    data = request.get_json(force=True)
+    entry = ks.update_entry(entry_id, data)
+    if entry is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(entry)
+
+
+@app.route("/api/knowledge/<entry_id>", methods=["DELETE"])
+def api_knowledge_delete(entry_id):
+    if not ks.delete_entry(entry_id):
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/knowledge/export", methods=["GET"])
+def api_knowledge_export():
+    data = ks._load()
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(
+        json_bytes,
+        mimetype="application/json",
+        headers={"Content-Disposition": 'attachment; filename="knowledge_backup.json"'},
+    )
+
+
+@app.route("/api/knowledge/import", methods=["POST"])
+def api_knowledge_import():
+    mode = request.args.get("mode", "merge")
+    if mode not in ("merge", "replace"):
+        return jsonify({"error": "mode must be merge or replace"}), 400
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file is required"}), 400
+    try:
+        raw = json.loads(f.read().decode("utf-8"))
+    except Exception:
+        return jsonify({"error": "Invalid JSON file"}), 400
+    entries = raw.get("entries", raw) if isinstance(raw, dict) else raw
+    if not isinstance(entries, list):
+        return jsonify({"error": "Invalid format: expected entries list"}), 400
+    result = ks.import_entries(entries, mode)
+    return jsonify(result)
+
+
+@app.route("/api/knowledge/analyze", methods=["POST"])
+def api_knowledge_analyze():
+    data = request.get_json(force=True)
+    api_key = data.get("api_key", "").strip()
+    base_url = data.get("base_url", "").strip()
+    model = data.get("model", "claude-sonnet-4-5").strip() or "claude-sonnet-4-5"
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+
+    if not api_key:
+        return jsonify({"error": "api_key is required"}), 400
+    if not title and not content:
+        return jsonify({"error": "title or content is required"}), 400
+
+    try:
+        result = analyze_entry(api_key, base_url, model, title, content)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify(result)
+
+
+# ── Knowledge Graph ────────────────────────────────────────────────────────────
+
+@app.route("/knowledge/graph")
+def knowledge_graph_page():
+    return render_template("knowledge_graph.html")
+
+
+@app.route("/api/knowledge/graph/build", methods=["POST"])
+def api_graph_build():
+    data = request.get_json(force=True)
+    api_key = data.get("api_key", "").strip()
+    base_url = data.get("base_url", "").strip()
+    model = data.get("model", "claude-sonnet-4-5").strip() or "claude-sonnet-4-5"
+    if not api_key:
+        return jsonify({"error": "api_key is required"}), 400
+    entries = ks.list_entries()
+    if not entries:
+        return jsonify({"error": "知识库为空，请先添加条目"}), 400
+    try:
+        graph = build_knowledge_graph(api_key, base_url, model, entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    ks.save_graph(graph)
+    return jsonify(graph)
+
+
+@app.route("/api/knowledge/graph", methods=["GET"])
+def api_graph_get():
+    return jsonify(ks.load_graph())
+
+
+# ── Skill Tree ─────────────────────────────────────────────────────────────────
+
+@app.route("/knowledge/skills")
+def knowledge_skills_page():
+    return render_template("skill_tree.html")
+
+
+@app.route("/api/knowledge/skill-tree/build", methods=["POST"])
+def api_skill_tree_build():
+    data = request.get_json(force=True)
+    api_key = data.get("api_key", "").strip()
+    base_url = data.get("base_url", "").strip()
+    model = data.get("model", "claude-sonnet-4-5").strip() or "claude-sonnet-4-5"
+    if not api_key:
+        return jsonify({"error": "api_key is required"}), 400
+    entries = ks.list_entries()
+    if not entries:
+        return jsonify({"error": "知识库为空，请先添加条目"}), 400
+    try:
+        tree = build_skill_tree(api_key, base_url, model, entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    ks.save_skill_tree(tree)
+    return jsonify(tree)
+
+
+@app.route("/api/knowledge/skill-tree", methods=["GET"])
+def api_skill_tree_get():
+    return jsonify(ks.load_skill_tree())
+
+
+# ── Validation ─────────────────────────────────────────────────────────────────
+
+@app.route("/knowledge/validate")
+def knowledge_validate_page():
+    return render_template("validation.html")
+
+
+@app.route("/api/knowledge/validate/run", methods=["POST"])
+def api_validate_run():
+    data = request.get_json(force=True)
+    api_key = data.get("api_key", "").strip()
+    base_url = data.get("base_url", "").strip()
+    model = data.get("model", "claude-sonnet-4-5").strip() or "claude-sonnet-4-5"
+    entry_ids = data.get("entry_ids", [])
+    if not api_key:
+        return jsonify({"error": "api_key is required"}), 400
+    if not entry_ids:
+        return jsonify({"error": "entry_ids is required"}), 400
+    entries = [ks.get_entry(eid) for eid in entry_ids]
+    entries = [e for e in entries if e]
+    if not entries:
+        return jsonify({"error": "No valid entries found"}), 400
+    try:
+        new_results = validate_entries(api_key, base_url, model, entries)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    # Merge into existing validation results
+    store = ks.load_validation()
+    existing_ids = {r["entry_id"] for r in store["results"]}
+    for r in new_results:
+        if r["entry_id"] in existing_ids:
+            store["results"] = [r if x["entry_id"] == r["entry_id"] else x for x in store["results"]]
+        else:
+            store["results"].append(r)
+    store["last_run_at"] = datetime.now(timezone.utc).isoformat()
+    ks.save_validation(store)
+    return jsonify({"results": new_results})
+
+
+@app.route("/api/knowledge/validate/results", methods=["GET"])
+def api_validate_results():
+    return jsonify(ks.load_validation())
+
+
+@app.route("/api/knowledge/validate/decide", methods=["POST"])
+def api_validate_decide():
+    data = request.get_json(force=True)
+    result_id = data.get("result_id", "").strip()
+    decision = data.get("decision", "").strip()
+    if decision not in ("approve", "reject"):
+        return jsonify({"error": "decision must be approve or reject"}), 400
+    store = ks.load_validation()
+    target = next((r for r in store["results"] if r["id"] == result_id), None)
+    if not target:
+        return jsonify({"error": "result not found"}), 404
+    if decision == "approve":
+        correction = target.get("suggested_correction")
+        if correction:
+            ks.apply_correction(target["entry_id"], correction)
+        target["status"] = "applied"
+    else:
+        target["status"] = "rejected"
+    ks.save_validation(store)
+    return jsonify(target)
 
 
 if __name__ == "__main__":

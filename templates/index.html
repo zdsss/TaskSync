@@ -247,6 +247,20 @@
       min-height: 44px;
       line-height: 44px;
     }
+
+    .reorder-btn {
+      border: 1px solid #d1d1d6;
+      border-radius: 6px;
+      min-height: 32px;
+      min-width: 32px;
+      background: #f9f9fb;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -255,6 +269,7 @@
 <div id="state1">
   <h1>TaskSync</h1>
   <p class="subtitle">Turn any goal into a calendar</p>
+  <p style="text-align:center; margin-bottom:16px;"><a href="/knowledge" style="color:#007aff; font-size:15px; text-decoration:none;">📚 知识库</a></p>
 
   <div class="card">
     <label>API Key</label>
@@ -346,6 +361,7 @@
   let currentSubtasks = [];
   let formData = {};
   let apiKeyMem = "";
+  let totalDays = 0;
 
   // Init
   (function init() {
@@ -366,7 +382,16 @@
 
   function addSlot() {
     const val = document.getElementById("newSlotTime").value;
-    if (val && !slots.includes(val)) {
+    if (!/^\d{2}:\d{2}$/.test(val)) {
+      showError("error1", "时间格式无效，请使用 HH:MM 格式");
+      return;
+    }
+    const [h, m] = val.split(":").map(Number);
+    if (h > 23 || m > 59) {
+      showError("error1", `时间槽超出范围：${val}`);
+      return;
+    }
+    if (!slots.includes(val)) {
       slots.push(val);
       slots.sort();
       renderSlots();
@@ -430,6 +455,7 @@
       if (!res.ok) throw new Error(json.error || "Unknown error");
 
       currentSubtasks = json.subtasks;
+      totalDays = weeks * 7;
       // Clear API key from memory after use
       apiKeyMem = "";
       document.getElementById("apiKey").value = "";
@@ -450,7 +476,11 @@
       <div class="subtask-card" id="subtask-${i}">
         <div class="card-header">
           <span class="subtask-num">Task ${i + 1}</span>
-          <button class="delete-btn" onclick="deleteSubtask(${i})" aria-label="Delete task ${i+1}">&#215;</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="reorder-btn" onclick="moveSubtask(${i},-1)" ${i===0?'disabled':''} aria-label="上移">▲</button>
+            <button class="reorder-btn" onclick="moveSubtask(${i},1)" ${i===currentSubtasks.length-1?'disabled':''} aria-label="下移">▼</button>
+            <button class="delete-btn" onclick="deleteSubtask(${i})" aria-label="Delete task ${i+1}">&#215;</button>
+          </div>
         </div>
         <label>Title</label>
         <input type="text" value="${escHtml(s.title)}" oninput="updateSubtask(${i},'title',this.value)">
@@ -465,7 +495,8 @@
           </div>
           <div>
             <label>Day Offset</label>
-            <input type="number" min="0" value="${s.suggested_day_offset}" oninput="updateSubtask(${i},'suggested_day_offset',parseInt(this.value)||0)">
+            <input type="number" min="0" max="${totalDays||''}" value="${s.suggested_day_offset}"
+              oninput="updateSubtask(${i},'suggested_day_offset',parseInt(this.value)||0); validateOffset(${i},this)">
           </div>
         </div>
       </div>
@@ -500,6 +531,24 @@
     // Scroll to new card
     const cards = document.querySelectorAll(".subtask-card");
     cards[cards.length - 1].scrollIntoView({ behavior: "smooth" });
+  }
+
+  function moveSubtask(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= currentSubtasks.length) return;
+    [currentSubtasks[i], currentSubtasks[j]] = [currentSubtasks[j], currentSubtasks[i]];
+    renderSubtasks();
+  }
+
+  function validateOffset(i, input) {
+    const val = parseInt(input.value) || 0;
+    if (totalDays > 0 && val > totalDays) {
+      input.style.borderColor = "#ff9500";
+      input.title = `偏移超出计划天数 (${totalDays} 天)`;
+    } else {
+      input.style.borderColor = "";
+      input.title = "";
+    }
   }
 
   async function generateIcs() {
