@@ -1,6 +1,6 @@
 import json
 import os
-import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -58,7 +58,7 @@ def get_entry(entry_id: str) -> dict | None:
 
 def create_entry(entry: dict) -> dict:
     data = _load()
-    entry_id = f"ke_{int(time.time() * 1000)}"
+    entry_id = f"ke_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat()
     entry["id"] = entry_id
     entry.setdefault("created_at", now)

@@ -206,7 +206,7 @@
     const evidenceLinks = isHas && skill.evidence_entry_ids && skill.evidence_entry_ids.length
       ? skill.evidence_entry_ids.map(id => {
           const e = entryMap[id];
-          return e ? `<a class="evidence-link" href="/knowledge#entry=${id}">${escHtml(e.title)}</a>` : "";
+          return e ? `<a class="evidence-link" href="/knowledge#entry=${encodeURIComponent(id)}">${escHtml(e.title)}</a>` : "";
         }).filter(Boolean).join("")
       : "";
     const reason = !isHas && skill.recommendation_reason

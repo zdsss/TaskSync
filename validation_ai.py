@@ -88,7 +88,10 @@ Return ONLY the JSON object, no markdown, no explanation."""
     raw = check_resp.choices[0].message.content.strip()
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
-    data = json.loads(raw.strip())
+    try:
+        data = json.loads(raw.strip())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"AI 返回了无效的 JSON：{e}") from e
 
     return {
         "id": val_id,

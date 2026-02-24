@@ -193,7 +193,7 @@
           </div>
           <div class="cluster-body hidden" id="clusterBody${i}">
             ${entries.length ? entries.map(e =>
-              `<a class="entry-link" href="/knowledge#entry=${e.id}">${escHtml(e.title)}</a>`
+              `<a class="entry-link" href="/knowledge#entry=${encodeURIComponent(e.id)}">${escHtml(e.title)}</a>`
             ).join("") : '<div style="color:#aeaeb2;font-size:13px;padding:8px 0">无匹配条目</div>'}
           </div>
         </div>`;
@@ -223,8 +223,8 @@
       const to = entryMap[r.to_id];
       const fromTitle = from ? escHtml(from.title) : escHtml(r.from_id);
       const toTitle = to ? escHtml(to.title) : escHtml(r.to_id);
-      const fromLink = from ? `<a href="/knowledge#entry=${r.from_id}" style="color:#007aff">${fromTitle}</a>` : fromTitle;
-      const toLink = to ? `<a href="/knowledge#entry=${r.to_id}" style="color:#007aff">${toTitle}</a>` : toTitle;
+      const fromLink = from ? `<a href="/knowledge#entry=${encodeURIComponent(r.from_id)}" style="color:#007aff">${fromTitle}</a>` : fromTitle;
+      const toLink = to ? `<a href="/knowledge#entry=${encodeURIComponent(r.to_id)}" style="color:#007aff">${toTitle}</a>` : toTitle;
       const rel = r.relation || "related";
       return `<tr>
         <td>${fromLink}</td>
