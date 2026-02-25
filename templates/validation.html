@@ -102,8 +102,17 @@
       .entry-check-item { border-bottom-color: #2c2c2e; }
       .verdict-unverifiable { background: #2c2c2e; color: #8e8e93; }
       .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
+      ._settings-modal-inner { background: #1c1c1e; }
     }
+
+    /* ── Settings Modal ── */
+    ._settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+    ._settings-modal-inner { background: #fff; border-radius: 16px 16px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); width: 100%; max-width: 600px; }
+    ._settings-modal-inner h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+    ._settings-row { display: flex; gap: 8px; margin-top: 14px; }
+    ._settings-row button { flex: 1; min-height: 44px; font-size: 15px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; }
   </style>
+  <script src="/static/api-config.js"></script>
 </head>
 <body>
 
@@ -112,7 +121,25 @@
     <span class="nav-back-chevron">‹</span><span>知识库</span>
   </a>
   <div class="nav-title">知识校验</div>
+  <button onclick="openSettingsModal()" style="position:absolute;right:8px;bottom:0;height:44px;background:none;border:none;font-size:20px;cursor:pointer;color:#007aff;padding:0 6px;" aria-label="设置">⚙️</button>
 </nav>
+
+<!-- Settings Modal -->
+<div id="_settingsModal" class="_settings-overlay hidden" onclick="if(event.target===this)closeSettingsModal()">
+  <div class="_settings-modal-inner">
+    <h2>API 配置</h2>
+    <label style="margin-top:0">API Key</label>
+    <input type="password" id="_cfgApiKey" placeholder="sk-…" autocomplete="off">
+    <label>API Base URL（可选）</label>
+    <input type="url" id="_cfgBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
+    <label>模型</label>
+    <input type="text" id="_cfgModelName" placeholder="claude-sonnet-4-5">
+    <div class="_settings-row">
+      <button style="background:#e5e5ea;color:#1c1c1e" onclick="clearSettingsModal({apiKey:'aiApiKey',baseUrl:'aiBaseUrl',modelName:'aiModel'})">清除配置</button>
+      <button style="background:#007aff;color:#fff" onclick="saveSettingsModal({apiKey:'aiApiKey',baseUrl:'aiBaseUrl',modelName:'aiModel'})">保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- STATE: select -->
 <div id="stateSelect">
@@ -197,6 +224,7 @@
       currentResults = saved.results;
       showResults();
     }
+    fillApiConfigInputs({ apiKey: "aiApiKey", baseUrl: "aiBaseUrl", modelName: "aiModel" });
   }
 
   function toggleAi() {
@@ -235,6 +263,8 @@
 
     const selectedIds = Array.from(document.querySelectorAll("#entryChecklist input[type=checkbox]:checked")).map(cb => cb.value);
     if (!selectedIds.length) { errEl.textContent = "请至少选择一条条目"; errEl.classList.remove("hidden"); return; }
+
+    collectAndSaveApiConfig({ apiKey: "aiApiKey", baseUrl: "aiBaseUrl", modelName: "aiModel" });
 
     document.getElementById("stateSelect").classList.add("hidden");
     document.getElementById("stateRunning").classList.remove("hidden");
