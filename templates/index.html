@@ -354,15 +354,8 @@
       .reorder-btn { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
       .instructions { background: #1c1c1e; }
       .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
-      ._settings-modal-inner { background: #1c1c1e; }
     }
 
-    /* ── Settings Modal ── */
-    ._settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
-    ._settings-modal-inner { background: #fff; border-radius: 16px 16px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); width: 100%; max-width: 600px; }
-    ._settings-modal-inner h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; text-align: center; }
-    ._settings-row { display: flex; gap: 8px; margin-top: 14px; }
-    ._settings-row button { flex: 1; min-height: 44px; font-size: 15px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; }
   </style>
   <script src="/static/api-config.js"></script>
 </head>
@@ -374,25 +367,8 @@
   </button>
   <div class="nav-title" id="navTitle">TaskSync</div>
   <a class="nav-action" href="/knowledge" id="navAction">知识库</a>
-  <button onclick="openSettingsModal()" style="position:absolute;right:52px;bottom:0;height:44px;background:none;border:none;font-size:20px;cursor:pointer;color:#007aff;padding:0 6px;" aria-label="设置">⚙️</button>
+  <button class="nav-btn-settings" style="right:52px" onclick="openSettingsModal({apiKey:'apiKey',baseUrl:'baseUrl',modelName:'modelName'})" aria-label="设置"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </nav>
-
-<!-- Settings Modal -->
-<div id="_settingsModal" class="_settings-overlay hidden" onclick="if(event.target===this)closeSettingsModal()">
-  <div class="_settings-modal-inner">
-    <h2>API 配置</h2>
-    <label style="margin-top:0">API Key</label>
-    <input type="password" id="_cfgApiKey" placeholder="sk-…" autocomplete="off">
-    <label>API Base URL（可选）</label>
-    <input type="url" id="_cfgBaseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
-    <label>模型</label>
-    <input type="text" id="_cfgModelName" placeholder="claude-sonnet-4-5">
-    <div class="_settings-row">
-      <button style="background:#e5e5ea;color:#1c1c1e" onclick="clearSettingsModal({apiKey:'apiKey',baseUrl:'baseUrl',modelName:'modelName'})">清除配置</button>
-      <button style="background:#007aff;color:#fff" onclick="saveSettingsModal({apiKey:'apiKey',baseUrl:'baseUrl',modelName:'modelName'})">保存</button>
-    </div>
-  </div>
-</div>
 
 <!-- STATE 1: Input Form -->
 <div id="state1">
