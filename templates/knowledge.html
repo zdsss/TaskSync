@@ -2,21 +2,26 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>知识库 — TaskSync</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f2f2f7;
       color: #1c1c1e;
       min-height: 100vh;
-      padding: 16px;
+      padding-top: calc(44px + env(safe-area-inset-top) + 16px);
+      padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px);
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      overscroll-behavior: none;
     }
-
-    h1 { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
-    .subtitle { text-align: center; color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
 
     .card {
       background: #fff;
@@ -289,16 +294,130 @@
     .tag-cloud-pill.active { background: #34c759; color: #fff; border-color: #34c759; }
 
     mark { background: #ffeb3b; color: inherit; border-radius: 2px; padding: 0 1px; }
+
+    /* ── iOS Navigation Bar ── */
+    .nav-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: calc(44px + env(safe-area-inset-top));
+      padding-top: env(safe-area-inset-top);
+      background: rgba(242, 242, 247, 0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(60, 60, 67, 0.2);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    .nav-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #1c1c1e;
+      padding-bottom: 11px;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-back {
+      position: absolute;
+      left: 8px; bottom: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      color: #007aff;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 0 8px;
+      gap: 2px;
+    }
+    .nav-back-chevron { font-size: 22px; line-height: 1; margin-top: -1px; }
+    .nav-action {
+      position: absolute;
+      right: 8px; bottom: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      color: #007aff;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 0 8px;
+      font-weight: 600;
+    }
+
+    /* ── iOS Tab Bar ── */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: calc(49px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(242, 242, 247, 0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-top: 0.5px solid rgba(60, 60, 67, 0.2);
+      display: flex;
+      z-index: 100;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #8e8e93;
+      font-size: 10px;
+      font-weight: 500;
+      padding-top: 6px;
+    }
+    .tab-item.active { color: #007aff; }
+    .tab-icon { font-size: 24px; line-height: 1; }
+
+    /* ── Dark Mode ── */
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .nav-bar, .tab-bar { background: rgba(28, 28, 30, 0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-title { color: #fff; }
+      .card { background: #1c1c1e; }
+      .entry-card { background: #1c1c1e; }
+      label { color: #8e8e93; }
+      input, textarea, select { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
+      input:focus, textarea:focus, select:focus { background: #3a3a3c; border-color: #007aff; }
+      .btn-secondary { background: #2c2c2e; color: #fff; }
+      .btn-danger { background: #ff453a; }
+      .chip { background: #2c2c2e; color: #ebebf5; }
+      .chip.active { background: #007aff; color: #fff; }
+      .tag-pill { background: #2c2c2e; color: #ebebf5; }
+      .tag-editable { background: #2c2c2e; color: #fff; }
+      .tag-cloud-pill { background: #1c1c1e; border-color: #3a3a3c; color: #ebebf5; }
+      .tag-cloud-pill.active { background: #30d158; border-color: #30d158; color: #fff; }
+      .ai-section { border-color: #3a3a3c; }
+      .ai-toggle { background: #2c2c2e; }
+      .ai-body { background: #1c1c1e; }
+      .detail-content code { background: #2c2c2e; }
+      .detail-content pre { background: #2c2c2e; }
+      .detail-content blockquote { border-left-color: #3a3a3c; color: #8e8e93; }
+      .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
+      hr { border-top-color: #2c2c2e !important; }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
+<nav class="nav-bar">
+  <button class="nav-back hidden" id="navBack" onclick="showList()">
+    <span class="nav-back-chevron">‹</span><span>知识库</span>
+  </button>
+  <div class="nav-title" id="navTitle">知识库</div>
+  <button class="nav-action hidden" id="navNew" onclick="showForm(null)">新建</button>
+</nav>
+
 <!-- STATE: list -->
 <div id="stateList">
-  <h1>📚 知识库</h1>
-  <p class="subtitle">沉淀经验，随时检索</p>
-
   <div class="search-row">
     <input type="search" id="searchInput" placeholder="搜索标题、内容、标签…" oninput="onSearchInput()">
     <button class="btn btn-primary btn-sm" onclick="showForm(null)" style="white-space:nowrap">+ 新建</button>
@@ -328,9 +447,6 @@
 
 <!-- STATE: form -->
 <div id="stateForm" class="hidden">
-  <span class="back-link" onclick="showList()">← 返回</span>
-  <div style="font-size:20px;font-weight:700;margin-bottom:16px;" id="formTitle">新建条目</div>
-
   <div class="card">
     <label>类型</label>
     <select id="fType">
@@ -388,8 +504,6 @@
 
 <!-- STATE: detail -->
 <div id="stateDetail" class="hidden">
-  <span class="back-link" onclick="showList()">← 返回</span>
-
   <div class="card">
     <div class="entry-header">
       <div class="entry-title" id="dTitle"></div>
@@ -409,6 +523,17 @@
     <button class="btn btn-danger" onclick="deleteCurrent()">删除</button>
   </div>
 </div>
+
+<nav class="tab-bar">
+  <a class="tab-item" href="/">
+    <span class="tab-icon">📅</span>
+    <span>任务</span>
+  </a>
+  <div class="tab-item active">
+    <span class="tab-icon">📚</span>
+    <span>知识库</span>
+  </div>
+</nav>
 
 <script>
   const TYPES = ["bug","experience","skill","note","command","link"];
@@ -500,6 +625,9 @@
     document.getElementById("stateList").classList.remove("hidden");
     document.getElementById("stateForm").classList.add("hidden");
     document.getElementById("stateDetail").classList.add("hidden");
+    document.getElementById("navTitle").textContent = "知识库";
+    document.getElementById("navBack").classList.add("hidden");
+    document.getElementById("navNew").classList.remove("hidden");
     loadEntries();
     loadTagCloud();
   }
@@ -507,7 +635,10 @@
   function showForm(entry) {
     editingId = entry ? entry.id : null;
     formTags = entry ? [...(entry.tags || [])] : [];
-    document.getElementById("formTitle").textContent = entry ? "编辑条目" : "新建条目";
+    const title = entry ? "编辑条目" : "新建条目";
+    document.getElementById("navTitle").textContent = title;
+    document.getElementById("navBack").classList.remove("hidden");
+    document.getElementById("navNew").classList.add("hidden");
     document.getElementById("fType").value = entry ? entry.type : "note";
     document.getElementById("fTitle").value = entry ? entry.title : "";
     document.getElementById("fContent").value = entry ? entry.content : "";
@@ -516,7 +647,6 @@
     document.getElementById("fTagInput").value = "";
     document.getElementById("formError").classList.add("hidden");
     renderFormTags();
-    // Reset AI section
     aiOpen = false;
     document.getElementById("aiBody").classList.add("hidden");
     document.getElementById("aiArrow").textContent = "▼";
@@ -532,6 +662,10 @@
     const entry = allEntries.find(e => e.id === id);
     if (!entry) return;
     currentEntry = entry;
+    const shortTitle = entry.title.length > 20 ? entry.title.slice(0, 20) + "…" : entry.title;
+    document.getElementById("navTitle").textContent = shortTitle;
+    document.getElementById("navBack").classList.remove("hidden");
+    document.getElementById("navNew").classList.add("hidden");
     document.getElementById("dTitle").textContent = entry.title;
     const badge = document.getElementById("dTypeBadge");
     badge.textContent = TYPE_LABELS[entry.type] || entry.type;

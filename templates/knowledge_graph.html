@@ -2,11 +2,15 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>知识图谱 — TaskSync</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; padding: 16px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; padding-top: calc(44px + env(safe-area-inset-top) + 16px); padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); overscroll-behavior: none; }
     h1 { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
     .subtitle { text-align: center; color: #6e6e73; font-size: 14px; margin-bottom: 24px; }
     .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -22,12 +26,11 @@
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .hidden { display: none !important; }
-    .back-link { display: inline-block; color: #007aff; font-size: 15px; margin-bottom: 16px; cursor: pointer; min-height: 44px; line-height: 44px; text-decoration: none; }
+    .back-link { display: none; }
     .ai-section { border: 1px solid #d1d1d6; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
     .ai-toggle { width: 100%; background: #f9f9fb; border: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: #007aff; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; }
     .ai-body { padding: 14px 16px; background: #fff; }
     .section-title { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
-    /* Cluster accordion */
     .cluster-card { background: #fff; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
     .cluster-header { padding: 14px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
     .cluster-label { font-size: 16px; font-weight: 700; }
@@ -36,7 +39,6 @@
     .cluster-body { padding: 0 16px 14px; border-top: 1px solid #f2f2f7; }
     .entry-link { display: block; padding: 8px 0; font-size: 14px; color: #007aff; text-decoration: none; border-bottom: 1px solid #f2f2f7; }
     .entry-link:last-child { border-bottom: none; }
-    /* Relationships table */
     .rel-table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .rel-table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 600; color: #6e6e73; text-transform: uppercase; border-bottom: 1px solid #e5e5ea; }
     .rel-table td { padding: 10px; border-bottom: 1px solid #f2f2f7; vertical-align: middle; }
@@ -48,13 +50,48 @@
     .empty-state { text-align: center; padding: 48px 16px; color: #aeaeb2; font-size: 15px; }
     .loading-state { text-align: center; padding: 48px 16px; color: #6e6e73; font-size: 15px; }
     .spinner-dark { display: inline-block; width: 20px; height: 20px; border: 2px solid #d1d1d6; border-top-color: #007aff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+
+    /* ── iOS Navigation Bar ── */
+    .nav-bar { position: fixed; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid rgba(60,60,67,0.2); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+    .nav-title { font-size: 17px; font-weight: 600; color: #1c1c1e; padding-bottom: 11px; }
+    .nav-back { position: absolute; left: 8px; bottom: 0; height: 44px; display: flex; align-items: center; color: #007aff; font-size: 17px; cursor: pointer; padding: 0 8px; gap: 2px; text-decoration: none; }
+    .nav-back-chevron { font-size: 22px; line-height: 1; margin-top: -1px; }
+
+    /* ── iOS Tab Bar ── */
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: calc(49px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid rgba(60,60,67,0.2); display: flex; z-index: 100; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; text-decoration: none; color: #8e8e93; font-size: 10px; font-weight: 500; padding-top: 6px; }
+    .tab-item.active { color: #007aff; }
+    .tab-icon { font-size: 24px; line-height: 1; }
+
+    /* ── Dark Mode ── */
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .nav-bar, .tab-bar { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-title { color: #fff; }
+      .card, .cluster-card { background: #1c1c1e; }
+      label { color: #8e8e93; }
+      input { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
+      input:focus { background: #3a3a3c; border-color: #007aff; }
+      .btn-secondary { background: #2c2c2e; color: #fff; }
+      .ai-section { border-color: #3a3a3c; }
+      .ai-toggle { background: #2c2c2e; }
+      .ai-body { background: #1c1c1e; }
+      .cluster-body { border-top-color: #2c2c2e; }
+      .entry-link { border-bottom-color: #2c2c2e; }
+      .rel-table th { border-bottom-color: #2c2c2e; }
+      .rel-table td { border-bottom-color: #2c2c2e; }
+      .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
+    }
   </style>
 </head>
 <body>
 
-<a class="back-link" href="/knowledge">← 返回知识库</a>
-<h1>🗺️ 知识图谱</h1>
-<p class="subtitle">AI 自动聚类，发现知识关联</p>
+<nav class="nav-bar">
+  <a class="nav-back" href="/knowledge">
+    <span class="nav-back-chevron">‹</span><span>知识库</span>
+  </a>
+  <div class="nav-title">知识图谱</div>
+</nav>
 
 <!-- AI Config -->
 <div class="ai-section">
@@ -99,6 +136,17 @@
     <div id="relEmpty" class="hidden" style="color:#aeaeb2;font-size:14px;padding:12px 0">暂无关联关系</div>
   </div>
 </div>
+
+<nav class="tab-bar">
+  <a class="tab-item" href="/">
+    <span class="tab-icon">📅</span>
+    <span>任务</span>
+  </a>
+  <a class="tab-item active" href="/knowledge">
+    <span class="tab-icon">📚</span>
+    <span>知识库</span>
+  </a>
+</nav>
 
 <script>
   let aiOpen = false;

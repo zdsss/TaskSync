@@ -2,31 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>TaskSync</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f2f2f7;
       color: #1c1c1e;
       min-height: 100vh;
-      padding: 16px;
-    }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 4px;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: #6e6e73;
-      font-size: 14px;
-      margin-bottom: 24px;
+      padding-top: calc(44px + env(safe-area-inset-top) + 16px);
+      padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px);
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      overscroll-behavior: none;
     }
 
     .card {
@@ -261,16 +255,120 @@
       justify-content: center;
     }
     .reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── iOS Navigation Bar ── */
+    .nav-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: calc(44px + env(safe-area-inset-top));
+      padding-top: env(safe-area-inset-top);
+      background: rgba(242, 242, 247, 0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(60, 60, 67, 0.2);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    .nav-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #1c1c1e;
+      padding-bottom: 11px;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-back {
+      position: absolute;
+      left: 8px;
+      bottom: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      color: #007aff;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 0 8px;
+      gap: 2px;
+    }
+    .nav-back-chevron { font-size: 22px; line-height: 1; margin-top: -1px; }
+    .nav-action {
+      position: absolute;
+      right: 8px;
+      bottom: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      color: #007aff;
+      font-size: 17px;
+      cursor: pointer;
+      padding: 0 8px;
+      text-decoration: none;
+    }
+
+    /* ── iOS Tab Bar ── */
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: calc(49px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(242, 242, 247, 0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-top: 0.5px solid rgba(60, 60, 67, 0.2);
+      display: flex;
+      z-index: 100;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #8e8e93;
+      font-size: 10px;
+      font-weight: 500;
+      padding-top: 6px;
+    }
+    .tab-item.active { color: #007aff; }
+    .tab-icon { font-size: 24px; line-height: 1; }
+
+    /* ── Dark Mode ── */
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .nav-bar, .tab-bar { background: rgba(28, 28, 30, 0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-title { color: #fff; }
+      .card { background: #1c1c1e; }
+      .subtask-card { background: #1c1c1e; }
+      label { color: #8e8e93; }
+      input, textarea, select { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
+      input:focus, textarea:focus, select:focus { background: #3a3a3c; border-color: #007aff; }
+      .btn-secondary { background: #2c2c2e; color: #fff; }
+      .slot-chip { background: #2c2c2e; color: #fff; }
+      .reorder-btn { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
+      .instructions { background: #1c1c1e; }
+      .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
+    }
   </style>
 </head>
 <body>
 
+<nav class="nav-bar">
+  <button class="nav-back hidden" id="navBack" onclick="navGoBack()">
+    <span class="nav-back-chevron">‹</span><span>Back</span>
+  </button>
+  <div class="nav-title" id="navTitle">TaskSync</div>
+  <a class="nav-action" href="/knowledge" id="navAction">知识库</a>
+</nav>
+
 <!-- STATE 1: Input Form -->
 <div id="state1">
-  <h1>TaskSync</h1>
-  <p class="subtitle">Turn any goal into a calendar</p>
-  <p style="text-align:center; margin-bottom:16px;"><a href="/knowledge" style="color:#007aff; font-size:15px; text-decoration:none;">📚 知识库</a></p>
-
   <div class="card">
     <label>API Key</label>
     <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
@@ -313,7 +411,6 @@
 
 <!-- STATE 2: Review Subtasks -->
 <div id="state2" class="hidden">
-  <span class="back-link" onclick="goBack(1)">&#8592; Back</span>
   <div class="section-title">Review Subtasks</div>
   <p class="section-sub">Edit, reorder, or delete tasks before scheduling.</p>
 
@@ -330,7 +427,6 @@
 
 <!-- STATE 3: Download -->
 <div id="state3" class="hidden">
-  <span class="back-link" onclick="goBack(2)">&#8592; Back</span>
   <div class="section-title">Ready to Import</div>
   <p class="section-sub">Your calendar file is ready.</p>
 
@@ -355,6 +451,17 @@
   </div>
 </div>
 
+<nav class="tab-bar">
+  <div class="tab-item active">
+    <span class="tab-icon">📅</span>
+    <span>任务</span>
+  </div>
+  <a class="tab-item" href="/knowledge">
+    <span class="tab-icon">📚</span>
+    <span>知识库</span>
+  </a>
+</nav>
+
 <script>
   // App state
   let slots = ["09:00"];
@@ -362,6 +469,25 @@
   let formData = {};
   let apiKeyMem = "";
   let totalDays = 0;
+  let currentStateNum = 1;
+
+  const NAV_TITLES = { 1: "TaskSync", 2: "Review Subtasks", 3: "Ready to Import" };
+
+  function setState(n) {
+    currentStateNum = n;
+    [1, 2, 3].forEach(i => {
+      document.getElementById("state" + i).classList.toggle("hidden", i !== n);
+    });
+    document.getElementById("navTitle").textContent = NAV_TITLES[n] || "TaskSync";
+    document.getElementById("navBack").classList.toggle("hidden", n === 1);
+    document.getElementById("navAction").classList.toggle("hidden", n !== 1);
+  }
+
+  function navGoBack() {
+    if (currentStateNum > 1) setState(currentStateNum - 1);
+  }
+
+  function goBack(n) { setState(n); }
 
   // Init
   (function init() {
@@ -413,16 +539,6 @@
 
   function hideError(id) {
     document.getElementById(id).classList.add("hidden");
-  }
-
-  function setState(n) {
-    [1, 2, 3].forEach(i => {
-      document.getElementById("state" + i).classList.toggle("hidden", i !== n);
-    });
-  }
-
-  function goBack(n) {
-    setState(n);
   }
 
   async function decompose() {
