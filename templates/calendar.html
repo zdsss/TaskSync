@@ -822,38 +822,34 @@ function updatePreviewBlock(el, startMin, endMin) {
 }
 
 function attachCreateDrag(col, dayIdx) {
-  col.addEventListener("touchstart", e => {
-    if (e.target.closest(".cal-event")) return;
-    const touch = e.touches[0];
+  function startCreate(clientY) {
     const scrollTop = document.getElementById("calScroll").scrollTop;
     const rect = col.getBoundingClientRect();
-    const relY = touch.clientY - rect.top + scrollTop;
+    const relY = clientY - rect.top + scrollTop;
     const rawMin = (relY / HOUR_PX) * 60;
     const startMin = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
-    createDrag = { col, dayIdx, startMin, endMin: startMin + 30, startY: touch.clientY, active: false, previewEl: null };
-  }, { passive: true });
+    createDrag = { col, dayIdx, startMin, endMin: startMin + 30, startY: clientY, active: false, previewEl: null };
+  }
 
-  col.addEventListener("touchmove", e => {
+  function moveCreate(clientY) {
     if (!createDrag || createDrag.col !== col) return;
-    const touch = e.touches[0];
-    const dy = touch.clientY - createDrag.startY;
+    const dy = clientY - createDrag.startY;
     if (!createDrag.active && dy > 10) {
       createDrag.active = true;
       createDrag.previewEl = createPreviewBlock(col, createDrag.startMin, createDrag.startMin + 30);
     }
     if (createDrag.active) {
-      e.preventDefault();
       const scrollTop = document.getElementById("calScroll").scrollTop;
       const rect = col.getBoundingClientRect();
-      const relY = touch.clientY - rect.top + scrollTop;
+      const relY = clientY - rect.top + scrollTop;
       const rawMin = (relY / HOUR_PX) * 60;
       const endMin = Math.max(createDrag.startMin + 15, Math.min(24 * 60, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
       createDrag.endMin = endMin;
       updatePreviewBlock(createDrag.previewEl, createDrag.startMin, endMin);
     }
-  }, { passive: false });
+  }
 
-  col.addEventListener("touchend", () => {
+  function endCreate() {
     if (!createDrag || createDrag.col !== col) return;
     if (createDrag.active && createDrag.previewEl) {
       createDrag.previewEl.remove();
@@ -864,6 +860,36 @@ function attachCreateDrag(col, dayIdx) {
       openCreateSheet(d, duration);
     }
     createDrag = null;
+  }
+
+  // Touch
+  col.addEventListener("touchstart", e => {
+    if (e.target.closest(".cal-event")) return;
+    startCreate(e.touches[0].clientY);
+  }, { passive: true });
+
+  col.addEventListener("touchmove", e => {
+    if (!createDrag || createDrag.col !== col) return;
+    if (createDrag.active) e.preventDefault();
+    moveCreate(e.touches[0].clientY);
+  }, { passive: false });
+
+  col.addEventListener("touchend", endCreate);
+
+  // Mouse
+  col.addEventListener("mousedown", e => {
+    if (e.target.closest(".cal-event")) return;
+    if (e.button !== 0) return;
+    startCreate(e.clientY);
+
+    function onMouseMove(e) { moveCreate(e.clientY); }
+    function onMouseUp() {
+      endCreate();
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   });
 }
 
