@@ -95,15 +95,20 @@
   const TYPE_LABELS = {bug:"Bug",experience:"经验",skill:"技巧",note:"笔记",command:"命令",link:"链接"};
 
   async function loadAll() {
-    const [statsRes, tasksRes, entriesRes] = await Promise.all([
-      fetch("/api/stats"), fetch("/api/tasks"), fetch("/api/knowledge")
-    ]);
-    const stats = await statsRes.json();
-    const tasks = await tasksRes.json();
-    const entries = await entriesRes.json();
-    renderStats(stats);
-    renderTagCloud(entries);
-    renderTaskGroups(tasks, entries);
+    try {
+      const [statsRes, tasksRes, entriesRes] = await Promise.all([
+        fetch("/api/stats"), fetch("/api/tasks"), fetch("/api/knowledge")
+      ]);
+      const stats = await statsRes.json();
+      const tasks = await tasksRes.json();
+      const entries = await entriesRes.json();
+      renderStats(stats);
+      renderTagCloud(entries);
+      renderTaskGroups(tasks, entries);
+    } catch(e) {
+      const container = document.getElementById("taskGroups");
+      if (container) container.innerHTML = `<div class="empty-state" style="color:#991b1b">加载失败：${e.message}</div>`;
+    }
   }
 
   function renderStats(stats) {
@@ -149,10 +154,10 @@
         </div>
         <div class="task-group-entries hidden" id="group-${idx}">
           ${groupEntries.map(e => `
-            <div class="ke-row">
+            <a class="ke-row" href="/knowledge#entry=${encodeURIComponent(e.id)}" style="text-decoration:none;color:inherit;display:flex;justify-content:space-between;align-items:center;">
               <div class="ke-title">${escHtml(e.title)}</div>
               <span class="type-badge type-${e.type}">${TYPE_LABELS[e.type]||e.type}</span>
-            </div>`).join("")}
+            </a>`).join("")}
         </div>
       </div>`;
     }).join("");

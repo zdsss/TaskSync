@@ -164,6 +164,7 @@
   <div class="chips-row" id="filterChips"></div>
 
   <div id="resultsList"></div>
+  <div id="decideError" class="hidden" style="margin-top:8px;padding:10px 14px;border-radius:8px;font-size:14px;background:#fee2e2;color:#991b1b"></div>
 
   <button class="btn" style="background:#e5e5ea;color:#1c1c1e;margin-top:8px" onclick="backToSelect()">← 重新选择</button>
 </div>
@@ -176,6 +177,10 @@
   <a class="tab-item active" href="/knowledge">
     <span class="tab-icon">📚</span>
     <span>知识库</span>
+  </a>
+  <a class="tab-item" href="/insights">
+    <span class="tab-icon">📊</span>
+    <span>洞察</span>
   </a>
 </nav>
 
@@ -363,13 +368,19 @@
   }
 
   async function decide(resultId, decision) {
+    const errEl = document.getElementById("decideError");
+    errEl.classList.add("hidden");
     const res = await fetch("/api/knowledge/validate/decide", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ result_id: resultId, decision }),
     });
     const json = await res.json();
-    if (!res.ok) { alert(json.error || "操作失败"); return; }
+    if (!res.ok) {
+      errEl.textContent = json.error || "操作失败";
+      errEl.classList.remove("hidden");
+      return;
+    }
     // Update in local array
     const idx = currentResults.findIndex(r => r.id === resultId);
     if (idx !== -1) currentResults[idx] = json;

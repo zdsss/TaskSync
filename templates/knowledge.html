@@ -436,6 +436,7 @@
     <a href="/knowledge/skills" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">🌳 技能树</a>
     <a href="/knowledge/validate" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;">✅ 知识校验</a>
   </div>
+  <div id="importMsg" class="hidden" style="margin-bottom:8px;padding:10px 14px;border-radius:8px;font-size:14px"></div>
 
   <div style="margin-bottom:12px;">
     <span class="chip active" id="sortChip" onclick="toggleSort()">按创建时间</span>
@@ -809,6 +810,11 @@
     if (res.ok) {
       currentEntry = null;
       showList();
+    } else {
+      const j = await res.json().catch(() => ({}));
+      const errEl = document.getElementById("formError");
+      errEl.textContent = "删除失败：" + (j.error || "未知错误");
+      errEl.classList.remove("hidden");
     }
   }
 
@@ -901,12 +907,23 @@
       source_url: currentEntry.source_url || "",
       tags: [...(currentEntry.tags || [])],
     };
-    const res = await fetch("/api/knowledge", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) showList();
+    const dupBtn = document.querySelector("#stateDetail .btn-secondary[onclick='duplicateCurrent()']");
+    if (dupBtn) { dupBtn.disabled = true; dupBtn.innerHTML = '<span class="spinner"></span>复制中…'; }
+    try {
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) { const j=await res.json(); throw new Error(j.error||"复制失败"); }
+      showList();
+    } catch(e) {
+      const errEl = document.getElementById("formError");
+      errEl.textContent = "复制失败：" + e.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      if (dupBtn) { dupBtn.disabled = false; dupBtn.textContent = "复制"; }
+    }
   }
 
   // ── Export / Import ───────────────────────────────────────────────────────
@@ -919,13 +936,18 @@
     if (!file) return;
     const fd = new FormData();
     fd.append("file", file);
+    const msgEl = document.getElementById("importMsg");
+    msgEl.className = "hidden";
     const res = await fetch("/api/knowledge/import?mode=merge", { method: "POST", body: fd });
     const json = await res.json();
     if (res.ok) {
-      alert(`导入完成：新增 ${json.added} 条，跳过 ${json.skipped} 条`);
+      msgEl.textContent = `导入完成：新增 ${json.added} 条，跳过 ${json.skipped} 条`;
+      msgEl.style.background = "#d1fae5"; msgEl.style.color = "#065f46";
     } else {
-      alert("导入失败：" + (json.error || "未知错误"));
+      msgEl.textContent = "导入失败：" + (json.error || "未知错误");
+      msgEl.style.background = "#fee2e2"; msgEl.style.color = "#991b1b";
     }
+    msgEl.classList.remove("hidden");
     input.value = "";
     loadEntries();
     loadTagCloud();

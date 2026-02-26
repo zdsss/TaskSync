@@ -174,7 +174,7 @@
   <div id="suggestedEntries" class="hidden">
     <div class="section-header" style="margin-bottom:10px">AI 建议的知识条目</div>
     <div id="suggestedList"></div>
-    <button class="btn btn-success" id="acceptAllBtn" onclick="acceptAllSuggestions()" style="margin-bottom:10px">全部接受</button>
+    <button class="btn btn-success" id="acceptAllBtn" onclick="acceptAllSuggestions()" style="margin-bottom:10px">保存已接受</button>
   </div>
   <div id="reflectionError" class="error-box hidden"></div>
   <div style="display:flex;gap:10px;margin-top:8px">
@@ -271,7 +271,7 @@
       const res = await fetch(`/api/tasks/${taskId}/subtasks/${subtaskId}`, {
         method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify(updates)
       });
-      if (!res.ok) return;
+      if (!res.ok) { const j=await res.json(); showError("更新失败：" + (j.error||"未知错误")); return; }
       st.status = newStatus;
       st.completed_at = updates.completed_at;
       renderTask();
@@ -340,14 +340,26 @@
     const learned = document.getElementById("reflectionLearned").value.trim();
     const challenges = document.getElementById("reflectionChallenges").value.trim();
     const content = [learned && `**学到了什么**\n${learned}`, challenges && `**遇到的难点**\n${challenges}`].filter(Boolean).join("\n\n");
-    if (content) {
-      await fetch("/api/knowledge", {method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({type:"experience", title:`${task.title} — 反思`, content, source_task_id:taskId})});
+    const btn = document.querySelector("#reflectionSheet .btn-secondary");
+    const origText = btn.textContent;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>保存中…';
+    try {
+      if (content) {
+        const r1 = await fetch("/api/knowledge", {method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({type:"experience", title:`${task.title} — 反思`, content, source_task_id:taskId})});
+        if (!r1.ok) { const j=await r1.json(); throw new Error(j.error||"保存失败"); }
+      }
+      const r2 = await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
+      if (!r2.ok) { const j=await r2.json(); throw new Error(j.error||"完成失败"); }
+      closeReflection();
+      loadTask();
+      loadKnowledge();
+    } catch(e) {
+      document.getElementById("reflectionError").textContent = e.message;
+      document.getElementById("reflectionError").classList.remove("hidden");
+    } finally {
+      btn.disabled = false; btn.textContent = origText;
     }
-    await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
-    closeReflection();
-    loadTask();
-    loadKnowledge();
   }
 
   async function aiExtractKnowledge() {
@@ -359,7 +371,7 @@
     if (!content) { document.getElementById("reflectionError").textContent="请先填写反思内容"; document.getElementById("reflectionError").classList.remove("hidden"); return; }
     document.getElementById("reflectionError").classList.add("hidden");
     const btn = document.getElementById("aiExtractBtn");
-    btn.disabled=true; document.getElementById("aiExtractLabel").innerHTML='<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px"></span>分析中…';
+    btn.disabled=true; document.getElementById("aiExtractLabel").innerHTML='<span class="spinner"></span>分析中…';
     try {
       const res = await fetch("/api/knowledge/analyze", {method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({api_key:cfg.apiKey, base_url:cfg.baseUrl||"", model:cfg.modelName||"claude-sonnet-4-5", title:task.title, content})});
@@ -392,19 +404,39 @@
 
   async function acceptAllSuggestions() {
     const toSave = suggestedEntries.filter(e => e.accepted);
-    for (const e of toSave) {
-      await fetch("/api/knowledge", {method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({...e, source_task_id:taskId})});
+    const btn = document.getElementById("acceptAllBtn");
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>保存中…';
+    try {
+      for (const e of toSave) {
+        const r = await fetch("/api/knowledge", {method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({...e, source_task_id:taskId})});
+        if (!r.ok) { const j=await r.json(); throw new Error(j.error||"保存失败"); }
+      }
+      const r2 = await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
+      if (!r2.ok) { const j=await r2.json(); throw new Error(j.error||"完成失败"); }
+      closeReflection();
+      loadTask();
+      loadKnowledge();
+    } catch(e) {
+      document.getElementById("reflectionError").textContent = e.message;
+      document.getElementById("reflectionError").classList.remove("hidden");
+    } finally {
+      btn.disabled = false; btn.textContent = "保存已接受";
     }
-    await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
-    closeReflection();
-    loadTask();
-    loadKnowledge();
   }
 
   async function markComplete() {
-    await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
-    loadTask();
+    const btn = document.getElementById("completeBtn");
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>处理中…'; }
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/complete`, {method:"POST"});
+      if (!res.ok) { const j=await res.json(); throw new Error(j.error||"操作失败"); }
+      loadTask();
+    } catch(e) {
+      showError("完成失败：" + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "标记完成"; }
+    }
   }
 
   async function exportIcs() {
@@ -432,4 +464,4 @@
   loadKnowledge();
 </script>
 </body>
-</html></script>
+</html>
