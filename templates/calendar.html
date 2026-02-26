@@ -40,6 +40,13 @@
       color: #007aff; font-size: 14px; font-weight: 600;
       padding: 0 12px; border: none; background: none; cursor: pointer;
     }
+    .nav-filter {
+      position: absolute; left: 44px; bottom: 0; height: 44px;
+      display: flex; align-items: center;
+      color: #007aff; font-size: 14px; font-weight: 600;
+      padding: 0 12px; border: none; background: none; cursor: pointer;
+    }
+    .nav-filter.active { color: #ff9500; }
 
     /* Day header row */
     .cal-header {
@@ -193,6 +200,43 @@
     .status-pending { background: #f2f2f7; color: #6e6e73; }
     .status-done { background: #e5ffe9; color: #1a7a2e; }
 
+    /* Form styles */
+    .sheet-form { margin-bottom: 16px; }
+    .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .form-row label { font-size: 13px; color: #6e6e73; font-weight: 500; }
+    .form-row input, .form-row select {
+      height: 44px; padding: 0 12px;
+      border: 1px solid rgba(60,60,67,0.2); border-radius: 10px;
+      font-size: 16px; background: #f2f2f7; color: #1c1c1e;
+    }
+
+    /* Create drag preview */
+    .cal-create-preview {
+      position: absolute; left: 2px; right: 2px;
+      border-radius: 6px;
+      border: 2px dashed #007aff;
+      background: rgba(0,122,255,0.12);
+      pointer-events: none; z-index: 40;
+      padding: 4px 6px; overflow: hidden;
+    }
+    .preview-time { font-size: 11px; font-weight: 700; color: #007aff; white-space: nowrap; }
+    .preview-label { font-size: 10px; color: #007aff; opacity: 0.8; white-space: nowrap; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(60px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%) translateY(20px);
+      background: rgba(0,0,0,0.75); color: #fff;
+      padding: 10px 20px; border-radius: 20px;
+      font-size: 14px; font-weight: 500;
+      opacity: 0; transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none; z-index: 300; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Tiny event blocks */
+    .cal-event.tiny { padding: 0; border-left: 3px solid rgba(255,255,255,0.5); }
+
     /* Dark mode */
     @media (prefers-color-scheme: dark) {
       body { background: #000; color: #fff; }
@@ -210,6 +254,9 @@
       .btn-secondary { background: #2c2c2e; color: #fff; }
       .status-pending { background: #2c2c2e; color: #8e8e93; }
       .status-done { background: #1a3a22; color: #4cd964; }
+      .form-row input, .form-row select { background: #2c2c2e; color: #fff; border-color: rgba(255,255,255,0.15); }
+      .cal-create-preview { border-color: #0a84ff; background: rgba(10,132,255,0.18); }
+      .preview-time, .preview-label { color: #0a84ff; }
     }
   </style>
 </head>
@@ -218,6 +265,7 @@
 <nav class="nav-bar">
   <button class="nav-prev" id="btnPrev" onclick="shiftWeek(-1)">‹</button>
   <div class="nav-title" id="navTitle"></div>
+  <button class="nav-filter" id="btnFilter" onclick="openRangeFilter()">筛选</button>
   <button class="nav-next" id="btnNext" onclick="shiftWeek(1)">›</button>
   <button class="nav-today" onclick="goToday()">今天</button>
 </nav>
@@ -237,9 +285,70 @@
   <div id="detailBody"></div>
   <div class="sheet-btns">
     <button class="btn btn-secondary" style="flex:1" onclick="closeDetail()">关闭</button>
+    <button class="btn btn-secondary" style="flex:1" id="btnEditToggle" onclick="toggleEditMode()">编辑</button>
     <a class="btn btn-primary" style="flex:1;display:flex;align-items:center;justify-content:center;" id="detailLink">查看任务</a>
   </div>
 </div>
+
+<!-- Create sheet -->
+<div class="sheet-overlay hidden" id="createOverlay" onclick="closeCreate()"></div>
+<div class="sheet hidden" id="createSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">新建子任务</div>
+  <div class="sheet-form">
+    <div class="form-row">
+      <label>所属任务</label>
+      <select id="createTaskSelect"></select>
+    </div>
+    <div class="form-row">
+      <label>标题</label>
+      <input type="text" id="createTitle" placeholder="子任务标题">
+    </div>
+    <div class="form-row">
+      <label>时间</label>
+      <input type="datetime-local" id="createDatetime">
+    </div>
+    <div class="form-row">
+      <label>时长</label>
+      <select id="createDuration">
+        <option value="15">15 分钟</option>
+        <option value="30" selected>30 分钟</option>
+        <option value="45">45 分钟</option>
+        <option value="60">1 小时</option>
+        <option value="90">1.5 小时</option>
+        <option value="120">2 小时</option>
+      </select>
+    </div>
+  </div>
+  <div class="sheet-btns">
+    <button class="btn btn-secondary" style="flex:1" onclick="closeCreate()">取消</button>
+    <button class="btn btn-primary" style="flex:1" onclick="submitCreate()">创建</button>
+  </div>
+</div>
+
+<!-- Filter sheet -->
+<div class="sheet-overlay hidden" id="filterOverlay" onclick="closeRangeFilter()"></div>
+<div class="sheet hidden" id="filterSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">筛选时间段</div>
+  <div class="sheet-form">
+    <div class="form-row">
+      <label>开始日期</label>
+      <input type="date" id="filterStart">
+    </div>
+    <div class="form-row">
+      <label>结束日期</label>
+      <input type="date" id="filterEnd">
+    </div>
+    <div id="filterCount" style="font-size:13px;color:#6e6e73;margin-top:8px;"></div>
+  </div>
+  <div class="sheet-btns">
+    <button class="btn btn-secondary" style="flex:1" onclick="clearRangeFilter()">清除筛选</button>
+    <button class="btn btn-primary" style="flex:1" onclick="applyRangeFilter()">应用</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <nav class="tab-bar">
   <a class="tab-item" href="/"><span class="tab-icon">📅</span><span>任务</span></a>
@@ -257,6 +366,12 @@ const TASK_COLORS = ["#007aff","#34c759","#ff9500","#ff3b30","#af52de","#5ac8fa"
 let currentWeekStart = getMonday(new Date());
 let weekEvents = [];
 let drag = null;
+let createDrag = null;
+let currentDetailEv = null;
+let isEditMode = false;
+let allTasks = [];
+let rangeFilter = null;
+let allRangeEvents = [];
 
 function getMonday(d) {
   const day = d.getDay();
@@ -364,6 +479,9 @@ function renderGrid() {
     col.className = "cal-day-col" + (isToday ? " today" : "");
     col.dataset.day = i;
 
+    // Attach create drag handler
+    attachCreateDrag(col, i);
+
     // Hour lines
     for (let h = 0; h <= 23; h++) {
       const line = document.createElement("div");
@@ -407,7 +525,15 @@ function renderGrid() {
         (ev.is_computed ? " is-computed" : "") +
         (ev.status === "done" ? " status-done" : "");
       el.style.cssText = `top:${top}px;height:${height}px;background:${taskColor(ev.task_id)};left:calc(${leftPct}% + 2px);width:calc(${widthPct}% - 4px);`;
-      el.innerHTML = `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escHtml(ev.title)}</div>`;
+      if (height < 22) {
+        el.classList.add("tiny");
+      } else if (height < 30) {
+        el.innerHTML = `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escHtml(ev.title)}</div>`;
+      } else {
+        const evD = new Date(ev.scheduled_at);
+        const evTime = `${pad(evD.getHours())}:${pad(evD.getMinutes())}`;
+        el.innerHTML = `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escHtml(ev.title)}</div><div style="font-size:10px;opacity:0.85;font-weight:400">${evTime}</div>`;
+      }
 
       el.addEventListener("click", e => { e.stopPropagation(); openDetail(ev); });
       initDrag(el, ev);
@@ -424,6 +550,17 @@ function renderWeek() {
 }
 
 async function loadWeek() {
+  if (rangeFilter) {
+    const wsTime = currentWeekStart.getTime();
+    const weTime = wsTime + 6 * 86400000;
+    weekEvents = allRangeEvents.filter(ev => {
+      const d = new Date(ev.scheduled_at);
+      d.setHours(0,0,0,0);
+      return d.getTime() >= wsTime && d.getTime() <= weTime;
+    });
+    renderWeek();
+    return;
+  }
   const start = isoDate(currentWeekStart);
   try {
     const res = await fetch(`/api/calendar/week?start=${start}`);
@@ -452,33 +589,132 @@ function goToday() {
 }
 
 // Detail sheet
-function openDetail(ev) {
-  const statusLabels = { pending:"待完成", done:"已完成", in_progress:"进行中" };
-  const statusCls = { pending:"status-pending", done:"status-done", in_progress:"status-in-progress" };
-  const d = new Date(ev.scheduled_at);
-  const timeStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  document.getElementById("detailBody").innerHTML = `
-    <div class="sheet-title">${escHtml(ev.title)}</div>
-    <span class="status-chip ${statusCls[ev.status]||'status-pending'}">${statusLabels[ev.status]||ev.status}</span>
-    <div class="sheet-meta">📋 ${escHtml(ev.task_title)} · ${timeStr} · ${ev.duration_minutes} 分钟${ev.is_computed ? ' · 计算时间' : ''}</div>
-    ${ev.description ? `<div class="sheet-desc">${escHtml(ev.description)}</div>` : ""}
-  `;
-  document.getElementById("detailLink").href = `/tasks/${ev.task_id}`;
-  document.getElementById("detailOverlay").classList.remove("hidden");
-  document.getElementById("detailSheet").classList.remove("hidden");
+function showSheet(overlayId, sheetId) {
+  document.getElementById(overlayId).classList.remove("hidden");
+  document.getElementById(sheetId).classList.remove("hidden");
   requestAnimationFrame(() => {
-    document.getElementById("detailOverlay").classList.add("visible");
-    document.getElementById("detailSheet").classList.add("visible");
+    document.getElementById(overlayId).classList.add("visible");
+    document.getElementById(sheetId).classList.add("visible");
   });
 }
 
-function closeDetail() {
-  document.getElementById("detailOverlay").classList.remove("visible");
-  document.getElementById("detailSheet").classList.remove("visible");
+function hideSheet(overlayId, sheetId) {
+  document.getElementById(overlayId).classList.remove("visible");
+  document.getElementById(sheetId).classList.remove("visible");
   setTimeout(() => {
-    document.getElementById("detailOverlay").classList.add("hidden");
-    document.getElementById("detailSheet").classList.add("hidden");
+    document.getElementById(overlayId).classList.add("hidden");
+    document.getElementById(sheetId).classList.add("hidden");
   }, 300);
+}
+
+function renderDetailBody(ev, editMode) {
+  const statusLabels = { pending:"待完成", done:"已完成", in_progress:"进行中" };
+  const statusCls = { pending:"status-pending", done:"status-done", in_progress:"status-in-progress" };
+  if (editMode) {
+    const d = new Date(ev.scheduled_at);
+    const dtLocal = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    document.getElementById("detailBody").innerHTML = `
+      <div class="sheet-form">
+        <div class="form-row"><label>标题</label><input type="text" id="editTitle" value="${escHtml(ev.title)}"></div>
+        <div class="form-row"><label>时间</label><input type="datetime-local" id="editDatetime" value="${dtLocal}"></div>
+        <div class="form-row"><label>时长（分钟）</label><input type="number" id="editDuration" value="${ev.duration_minutes}" min="5" max="480"></div>
+        <div class="form-row"><label>状态</label>
+          <select id="editStatus">
+            <option value="pending" ${ev.status==='pending'?'selected':''}>待完成</option>
+            <option value="in_progress" ${ev.status==='in_progress'?'selected':''}>进行中</option>
+            <option value="done" ${ev.status==='done'?'selected':''}>已完成</option>
+          </select>
+        </div>
+      </div>
+    `;
+  } else {
+    const d = new Date(ev.scheduled_at);
+    const timeStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    document.getElementById("detailBody").innerHTML = `
+      <div class="sheet-title">${escHtml(ev.title)}</div>
+      <span class="status-chip ${statusCls[ev.status]||'status-pending'}">${statusLabels[ev.status]||ev.status}</span>
+      <div class="sheet-meta">📋 ${escHtml(ev.task_title)} · ${timeStr} · ${ev.duration_minutes} 分钟${ev.is_computed ? ' · 计算时间' : ''}</div>
+      ${ev.description ? `<div class="sheet-desc">${escHtml(ev.description)}</div>` : ""}
+    `;
+  }
+}
+
+function openDetail(ev) {
+  currentDetailEv = ev;
+  isEditMode = false;
+  renderDetailBody(ev, false);
+  document.getElementById("detailLink").href = `/tasks/${ev.task_id}`;
+  document.getElementById("btnEditToggle").textContent = "编辑";
+  showSheet("detailOverlay", "detailSheet");
+}
+
+function closeDetail() {
+  hideSheet("detailOverlay", "detailSheet");
+  isEditMode = false;
+}
+
+function toggleEditMode() {
+  if (!isEditMode) {
+    isEditMode = true;
+    document.getElementById("btnEditToggle").textContent = "保存";
+    renderDetailBody(currentDetailEv, true);
+  } else {
+    saveDetailEdit();
+  }
+}
+
+async function saveDetailEdit() {
+  const titleEl = document.getElementById("editTitle");
+  const dtEl = document.getElementById("editDatetime");
+  const durEl = document.getElementById("editDuration");
+  const statusEl = document.getElementById("editStatus");
+
+  const newTitle = titleEl ? titleEl.value.trim() : currentDetailEv.title;
+  const newDatetime = dtEl ? dtEl.value : null;
+  const newDuration = durEl ? parseInt(durEl.value) : currentDetailEv.duration_minutes;
+  const newStatus = statusEl ? statusEl.value : currentDetailEv.status;
+
+  if (!newTitle) return;
+
+  const updates = { title: newTitle, duration_minutes: newDuration, status: newStatus };
+  if (newDatetime) {
+    updates.scheduled_at = newDatetime.length === 16 ? newDatetime + ":00" : newDatetime;
+  }
+  if (newStatus === "done" && currentDetailEv.status !== "done") {
+    updates.completed_at = new Date().toISOString();
+  }
+
+  const orig = { ...currentDetailEv };
+  Object.assign(currentDetailEv, updates);
+  if (updates.scheduled_at) currentDetailEv.scheduled_at = updates.scheduled_at;
+  currentDetailEv.is_computed = false;
+
+  isEditMode = false;
+  document.getElementById("btnEditToggle").textContent = "编辑";
+  renderDetailBody(currentDetailEv, false);
+  renderWeek();
+
+  try {
+    const res = await fetch(`/api/tasks/${currentDetailEv.task_id}/subtasks/${currentDetailEv.subtask_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error("patch failed");
+    const updated = await res.json();
+    Object.assign(currentDetailEv, {
+      title: updated.title,
+      duration_minutes: updated.duration_minutes,
+      status: updated.status,
+      scheduled_at: updated.scheduled_at || currentDetailEv.scheduled_at,
+    });
+    renderWeek();
+  } catch(e) {
+    Object.assign(currentDetailEv, orig);
+    renderWeek();
+    renderDetailBody(currentDetailEv, false);
+    showToast("保存失败，已还原");
+  }
 }
 
 // Drag & drop
@@ -551,6 +787,218 @@ function initDrag(el, ev) {
     }
     drag = null;
   });
+}
+
+// Drag-to-create
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+function snapToSelectOption(minutes) {
+  const options = [15, 30, 45, 60, 90, 120];
+  return options.reduce((prev, curr) => Math.abs(curr - minutes) < Math.abs(prev - minutes) ? curr : prev);
+}
+
+function createPreviewBlock(col, startMin, endMin) {
+  const el = document.createElement("div");
+  el.className = "cal-create-preview";
+  updatePreviewBlock(el, startMin, endMin);
+  col.appendChild(el);
+  return el;
+}
+
+function updatePreviewBlock(el, startMin, endMin) {
+  const top = (startMin / 60) * HOUR_PX;
+  const height = Math.max(15, ((endMin - startMin) / 60) * HOUR_PX);
+  el.style.top = top + "px";
+  el.style.height = height + "px";
+  const sh = Math.floor(startMin / 60), sm = startMin % 60;
+  const eh = Math.floor(endMin / 60), em = endMin % 60;
+  el.innerHTML = `<div class="preview-time">${pad(sh)}:${pad(sm)} – ${pad(eh)}:${pad(em)}</div><div class="preview-label">新建任务</div>`;
+}
+
+function attachCreateDrag(col, dayIdx) {
+  col.addEventListener("touchstart", e => {
+    if (e.target.closest(".cal-event")) return;
+    const touch = e.touches[0];
+    const scrollTop = document.getElementById("calScroll").scrollTop;
+    const rect = col.getBoundingClientRect();
+    const relY = touch.clientY - rect.top + scrollTop;
+    const rawMin = (relY / HOUR_PX) * 60;
+    const startMin = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
+    createDrag = { col, dayIdx, startMin, endMin: startMin + 30, startY: touch.clientY, active: false, previewEl: null };
+  }, { passive: true });
+
+  col.addEventListener("touchmove", e => {
+    if (!createDrag || createDrag.col !== col) return;
+    const touch = e.touches[0];
+    const dy = touch.clientY - createDrag.startY;
+    if (!createDrag.active && dy > 10) {
+      createDrag.active = true;
+      createDrag.previewEl = createPreviewBlock(col, createDrag.startMin, createDrag.startMin + 30);
+    }
+    if (createDrag.active) {
+      e.preventDefault();
+      const scrollTop = document.getElementById("calScroll").scrollTop;
+      const rect = col.getBoundingClientRect();
+      const relY = touch.clientY - rect.top + scrollTop;
+      const rawMin = (relY / HOUR_PX) * 60;
+      const endMin = Math.max(createDrag.startMin + 15, Math.min(24 * 60, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
+      createDrag.endMin = endMin;
+      updatePreviewBlock(createDrag.previewEl, createDrag.startMin, endMin);
+    }
+  }, { passive: false });
+
+  col.addEventListener("touchend", () => {
+    if (!createDrag || createDrag.col !== col) return;
+    if (createDrag.active && createDrag.previewEl) {
+      createDrag.previewEl.remove();
+      const d = new Date(currentWeekStart);
+      d.setDate(d.getDate() + dayIdx);
+      d.setHours(Math.floor(createDrag.startMin / 60), createDrag.startMin % 60, 0, 0);
+      const duration = snapToSelectOption(createDrag.endMin - createDrag.startMin);
+      openCreateSheet(d, duration);
+    }
+    createDrag = null;
+  });
+}
+  if (allTasks.length > 0) return;
+  try {
+    const res = await fetch("/api/tasks");
+    allTasks = await res.json();
+  } catch(e) { allTasks = []; }
+}
+
+async function openCreateSheet(prefilledDate, prefilledDuration) {
+  await loadAllTasks();
+  const select = document.getElementById("createTaskSelect");
+  select.innerHTML = allTasks.length === 0
+    ? '<option value="">（无任务）</option>'
+    : allTasks.map(t => `<option value="${escHtml(t.id)}">${escHtml(t.title)}</option>`).join("");
+
+  if (prefilledDate) {
+    const dtStr = `${prefilledDate.getFullYear()}-${pad(prefilledDate.getMonth()+1)}-${pad(prefilledDate.getDate())}T${pad(prefilledDate.getHours())}:${pad(prefilledDate.getMinutes())}`;
+    document.getElementById("createDatetime").value = dtStr;
+  }
+  document.getElementById("createTitle").value = "";
+  const dur = prefilledDuration ? snapToSelectOption(prefilledDuration) : 30;
+  document.getElementById("createDuration").value = String(dur);
+  showSheet("createOverlay", "createSheet");
+}
+
+function closeCreate() {
+  hideSheet("createOverlay", "createSheet");
+}
+
+async function submitCreate() {
+  const taskId = document.getElementById("createTaskSelect").value;
+  const title = document.getElementById("createTitle").value.trim();
+  const datetime = document.getElementById("createDatetime").value;
+  const duration = parseInt(document.getElementById("createDuration").value) || 30;
+
+  if (!taskId || !title || !datetime) return;
+
+  const scheduledAt = datetime.length === 16 ? datetime + ":00" : datetime;
+
+  try {
+    const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, scheduled_at: scheduledAt, duration_minutes: duration })
+    });
+    if (!res.ok) throw new Error("create failed");
+    const newSt = await res.json();
+
+    const task = allTasks.find(t => t.id === taskId);
+    const newEv = {
+      task_id: taskId,
+      task_title: task ? task.title : "",
+      subtask_id: newSt.id,
+      title: newSt.title,
+      description: newSt.description || "",
+      status: newSt.status,
+      duration_minutes: newSt.duration_minutes,
+      scheduled_at: scheduledAt,
+      is_computed: false,
+    };
+    weekEvents.push(newEv);
+    renderWeek();
+    closeCreate();
+  } catch(e) {
+    showToast("创建失败，请重试");
+  }
+}
+
+// Range filter
+function openRangeFilter() {
+  const ws = isoDate(currentWeekStart);
+  const we = new Date(currentWeekStart);
+  we.setDate(we.getDate() + 6);
+  document.getElementById("filterStart").value = ws;
+  document.getElementById("filterEnd").value = isoDate(we);
+  document.getElementById("filterCount").textContent = "";
+  showSheet("filterOverlay", "filterSheet");
+}
+
+function closeRangeFilter() {
+  hideSheet("filterOverlay", "filterSheet");
+}
+
+async function applyRangeFilter() {
+  const startStr = document.getElementById("filterStart").value;
+  const endStr = document.getElementById("filterEnd").value;
+  if (!startStr || !endStr || startStr > endStr) return;
+
+  const startDate = new Date(startStr + "T00:00:00");
+  const endDate = new Date(endStr + "T00:00:00");
+
+  const weeks = [];
+  let cur = getMonday(startDate);
+  while (cur <= endDate) {
+    weeks.push(isoDate(cur));
+    cur = new Date(cur);
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  const allEvs = [];
+  for (const wk of weeks) {
+    try {
+      const res = await fetch(`/api/calendar/week?start=${wk}`);
+      const data = await res.json();
+      allEvs.push(...(data.events || []));
+    } catch(e) {}
+  }
+
+  allRangeEvents = allEvs.filter(ev => {
+    const d = ev.scheduled_at.slice(0, 10);
+    return d >= startStr && d <= endStr;
+  });
+
+  rangeFilter = { start: startStr, end: endStr };
+  document.getElementById("filterCount").textContent = `找到 ${allRangeEvents.length} 个事件`;
+  document.getElementById("btnFilter").classList.add("active");
+
+  currentWeekStart = getMonday(startDate);
+  weekEvents = allRangeEvents.filter(ev => {
+    const d = new Date(ev.scheduled_at);
+    d.setHours(0,0,0,0);
+    const wsTime = currentWeekStart.getTime();
+    const weTime = wsTime + 6 * 86400000;
+    return d.getTime() >= wsTime && d.getTime() <= weTime;
+  });
+  renderWeek();
+  closeRangeFilter();
+}
+
+function clearRangeFilter() {
+  rangeFilter = null;
+  allRangeEvents = [];
+  document.getElementById("btnFilter").classList.remove("active");
+  closeRangeFilter();
+  loadWeek();
 }
 
 function escHtml(str) {
