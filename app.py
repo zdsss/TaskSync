@@ -112,8 +112,7 @@ def api_knowledge_tags():
 @app.route("/api/knowledge", methods=["GET"])
 def api_knowledge_list():
     type_filter = request.args.get("type", "").strip() or None
-    tag = request.args.get("tag", "").strip()
-    tags = [tag] if tag else None
+    tags = request.args.getlist("tag") or None
     q = request.args.get("q", "").strip() or None
     return jsonify(ks.list_entries(type_filter, tags, q))
 
@@ -143,6 +142,24 @@ def api_knowledge_delete(entry_id):
     if not ks.delete_entry(entry_id):
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/knowledge/bulk-delete", methods=["POST"])
+def api_knowledge_bulk_delete():
+    ids = request.json.get("ids", [])
+    deleted = ks.bulk_delete(ids)
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/api/knowledge/bulk-export", methods=["POST"])
+def api_knowledge_bulk_export():
+    ids = set(request.json.get("ids", []))
+    data = ks._load()
+    subset = [e for e in data["entries"] if e["id"] in ids]
+    payload = {"entries": subset}
+    json_bytes = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(json_bytes, mimetype="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="knowledge_export.json"'})
 
 
 @app.route("/api/knowledge/export", methods=["GET"])

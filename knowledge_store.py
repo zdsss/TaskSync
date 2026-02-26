@@ -97,6 +97,17 @@ def delete_entry(entry_id: str) -> bool:
     return False
 
 
+def bulk_delete(ids: list) -> int:
+    data = _load()
+    id_set = set(ids)
+    before = len(data["entries"])
+    data["entries"] = [e for e in data["entries"] if e["id"] not in id_set]
+    deleted = before - len(data["entries"])
+    if deleted:
+        _save(data)
+    return deleted
+
+
 def import_entries(entries: list, mode: str = "merge") -> dict:
     data = _load()
     existing_ids = {e["id"] for e in data["entries"]}
