@@ -9,6 +9,7 @@ from flask import Flask, jsonify, render_template, request, Response
 from calendar_generator import generate_ics
 from task_decomposer import decompose_task
 import knowledge_store as ks
+import task_store as ts
 from knowledge_ai import analyze_entry
 from knowledge_graph_ai import build_knowledge_graph
 from skill_tree_ai import build_skill_tree
@@ -331,6 +332,86 @@ def api_validate_decide():
         target["status"] = "rejected"
     ks.save_validation(store)
     return jsonify(target)
+
+
+
+
+# ── Tasks ──────────────────────────────────────────────────────────────────────
+
+@app.route("/tasks/<task_id>")
+def task_detail_page(task_id):
+    return render_template("task_detail.html")
+
+
+@app.route("/insights")
+def insights_page():
+    return render_template("insights.html")
+
+
+@app.route("/api/tasks", methods=["GET"])
+def api_tasks_list():
+    return jsonify(ts.list_tasks())
+
+
+@app.route("/api/tasks", methods=["POST"])
+def api_tasks_create():
+    data = request.get_json(force=True)
+    if not data.get("title", "").strip():
+        return jsonify({"error": "title is required"}), 400
+    task = ts.create_task(data)
+    return jsonify(task), 201
+
+
+@app.route("/api/tasks/<task_id>", methods=["GET"])
+def api_tasks_get(task_id):
+    task = ts.get_task(task_id)
+    if task is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(task)
+
+
+@app.route("/api/tasks/<task_id>", methods=["PUT"])
+def api_tasks_update(task_id):
+    data = request.get_json(force=True)
+    task = ts.update_task(task_id, data)
+    if task is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(task)
+
+
+@app.route("/api/tasks/<task_id>", methods=["DELETE"])
+def api_tasks_delete(task_id):
+    if not ts.delete_task(task_id):
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/tasks/<task_id>/subtasks/<subtask_id>", methods=["PATCH"])
+def api_subtask_update(task_id, subtask_id):
+    data = request.get_json(force=True)
+    st = ts.update_subtask(task_id, subtask_id, data)
+    if st is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(st)
+
+
+@app.route("/api/tasks/<task_id>/complete", methods=["POST"])
+def api_task_complete(task_id):
+    now = datetime.now(timezone.utc).isoformat()
+    task = ts.update_task(task_id, {"status": "done", "completed_at": now})
+    if task is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(task)
+
+
+@app.route("/api/tasks/<task_id>/knowledge", methods=["GET"])
+def api_task_knowledge(task_id):
+    return jsonify(ks.list_entries(source_task_id=task_id))
+
+
+@app.route("/api/stats", methods=["GET"])
+def api_stats():
+    return jsonify(ts.get_stats())
 
 
 if __name__ == "__main__":

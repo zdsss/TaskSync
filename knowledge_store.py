@@ -24,7 +24,7 @@ def _save(data: dict):
     tmp.replace(KNOWLEDGE_FILE)
 
 
-def list_entries(type_filter=None, tags=None, q=None) -> list:
+def list_entries(type_filter=None, tags=None, q=None, source_task_id=None) -> list:
     data = _load()
     entries = data["entries"]
 
@@ -44,6 +44,9 @@ def list_entries(type_filter=None, tags=None, q=None) -> list:
             or q_lower in e.get("summary", "").lower()
             or any(q_lower in t.lower() for t in e.get("tags", []))
         ]
+
+    if source_task_id:
+        entries = [e for e in entries if e.get("source_task_id") == source_task_id]
 
     return sorted(entries, key=lambda e: e.get("created_at", ""), reverse=True)
 

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <title>洞察 — TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh;
+      padding-top: calc(44px + env(safe-area-inset-top) + 16px);
+      padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px);
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+      overscroll-behavior: none; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .hidden { display: none !important; }
+    .nav-bar { position: fixed; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid rgba(60,60,67,0.2); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+    .nav-title { font-size: 17px; font-weight: 600; color: #1c1c1e; padding-bottom: 11px; }
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: calc(49px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid rgba(60,60,67,0.2); display: flex; z-index: 100; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; text-decoration: none; color: #8e8e93; font-size: 10px; font-weight: 500; padding-top: 6px; }
+    .tab-item.active { color: #007aff; }
+    .tab-icon { font-size: 24px; line-height: 1; }
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 14px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .stat-value { font-size: 28px; font-weight: 700; color: #007aff; line-height: 1.1; }
+    .stat-label { font-size: 11px; color: #6e6e73; margin-top: 4px; line-height: 1.3; }
+    /* Tag cloud */
+    .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag-pill { padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #e5e5ea; color: #3a3a3c; }
+    /* Section header */
+    .section-header { font-size: 13px; font-weight: 700; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    /* Task group */
+    .task-group { background: #fff; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+    .task-group-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .task-group-title { font-size: 15px; font-weight: 600; flex: 1; }
+    .task-group-count { font-size: 12px; color: #6e6e73; margin-left: 8px; }
+    .task-group-chevron { font-size: 14px; color: #aeaeb2; transition: transform 0.2s; }
+    .task-group-chevron.open { transform: rotate(90deg); }
+    .task-group-entries { padding: 0 16px 12px; border-top: 0.5px solid #f2f2f7; }
+    .ke-row { padding: 10px 0; border-bottom: 0.5px solid #f2f2f7; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .ke-row:last-child { border-bottom: none; }
+    .ke-title { font-size: 14px; font-weight: 500; flex: 1; }
+    .type-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+    .type-bug { background: #ffe5e5; color: #c0392b; }
+    .type-experience { background: #e5f0ff; color: #0055cc; }
+    .type-skill { background: #e5ffe9; color: #1a7a2e; }
+    .type-note { background: #fff8e5; color: #8a6000; }
+    .type-command { background: #f0e5ff; color: #6600cc; }
+    .type-link { background: #e5f9ff; color: #006688; }
+    .empty-state { text-align: center; padding: 32px 16px; color: #aeaeb2; font-size: 14px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .nav-bar, .tab-bar { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-title { color: #fff; }
+      .card, .stat-card, .task-group { background: #1c1c1e; }
+      .tag-pill { background: #2c2c2e; color: #ebebf5; }
+      .task-group-header { border-bottom-color: #2c2c2e; }
+      .task-group-entries { border-top-color: #2c2c2e; }
+      .ke-row { border-bottom-color: #2c2c2e; }
+    }
+  </style>
+</head>
+<body>
+<nav class="nav-bar">
+  <div class="nav-title">洞察</div>
+</nav>
+
+<div class="stats-grid" id="statsGrid">
+  <div class="stat-card"><div class="stat-value" id="statTasks">—</div><div class="stat-label">本月完成任务</div></div>
+  <div class="stat-card"><div class="stat-value" id="statRate">—</div><div class="stat-label">子任务完成率</div></div>
+  <div class="stat-card"><div class="stat-value" id="statEntries">—</div><div class="stat-label">新增知识条目</div></div>
+</div>
+
+<div class="card">
+  <div class="section-header">本月新增技能标签</div>
+  <div class="tag-cloud" id="tagCloud"><div class="empty-state" style="padding:8px">暂无数据</div></div>
+</div>
+
+<div class="card">
+  <div class="section-header">按任务分组的知识</div>
+  <div id="taskGroups"><div class="empty-state">暂无关联知识条目</div></div>
+</div>
+
+<nav class="tab-bar">
+  <a class="tab-item" href="/"><span class="tab-icon">📅</span><span>任务</span></a>
+  <a class="tab-item" href="/knowledge"><span class="tab-icon">📚</span><span>知识库</span></a>
+  <div class="tab-item active"><span class="tab-icon">📊</span><span>洞察</span></div>
+</nav>
+<script>
+  const TYPE_LABELS = {bug:"Bug",experience:"经验",skill:"技巧",note:"笔记",command:"命令",link:"链接"};
+
+  async function loadAll() {
+    const [statsRes, tasksRes, entriesRes] = await Promise.all([
+      fetch("/api/stats"), fetch("/api/tasks"), fetch("/api/knowledge")
+    ]);
+    const stats = await statsRes.json();
+    const tasks = await tasksRes.json();
+    const entries = await entriesRes.json();
+    renderStats(stats);
+    renderTagCloud(entries);
+    renderTaskGroups(tasks, entries);
+  }
+
+  function renderStats(stats) {
+    document.getElementById("statTasks").textContent = stats.completed_tasks_this_month ?? "—";
+    document.getElementById("statRate").textContent = stats.subtask_completion_rate != null ? stats.subtask_completion_rate + "%" : "—";
+    document.getElementById("statEntries").textContent = stats.new_knowledge_entries_this_month ?? "—";
+  }
+
+  function renderTagCloud(entries) {
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
+    const monthAgoIso = monthAgo.toISOString();
+    const freq = {};
+    entries.filter(e => (e.created_at||"") >= monthAgoIso).forEach(e => {
+      (e.tags||[]).forEach(t => { freq[t] = (freq[t]||0) + 1; });
+    });
+    const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,20);
+    const cloud = document.getElementById("tagCloud");
+    if (!sorted.length) { cloud.innerHTML = '<div style="color:#aeaeb2;font-size:14px">本月暂无新增标签</div>'; return; }
+    cloud.innerHTML = sorted.map(([tag,count]) =>
+      `<span class="tag-pill">${escHtml(tag)} <small style="opacity:0.6">${count}</small></span>`
+    ).join("");
+  }
+
+  function renderTaskGroups(tasks, entries) {
+    const byTask = {};
+    entries.filter(e => e.source_task_id).forEach(e => {
+      if (!byTask[e.source_task_id]) byTask[e.source_task_id] = [];
+      byTask[e.source_task_id].push(e);
+    });
+    const taskIds = Object.keys(byTask);
+    const container = document.getElementById("taskGroups");
+    if (!taskIds.length) { container.innerHTML = '<div class="empty-state">暂无关联知识条目</div>'; return; }
+    container.innerHTML = taskIds.map((tid, idx) => {
+      const t = tasks.find(t => t.id === tid);
+      const title = t ? t.title : tid;
+      const groupEntries = byTask[tid];
+      return `<div class="task-group">
+        <div class="task-group-header" onclick="toggleGroup(${idx})">
+          <div class="task-group-title">${escHtml(title)}</div>
+          <span class="task-group-count">${groupEntries.length} 条</span>
+          <span class="task-group-chevron" id="chevron-${idx}">›</span>
+        </div>
+        <div class="task-group-entries hidden" id="group-${idx}">
+          ${groupEntries.map(e => `
+            <div class="ke-row">
+              <div class="ke-title">${escHtml(e.title)}</div>
+              <span class="type-badge type-${e.type}">${TYPE_LABELS[e.type]||e.type}</span>
+            </div>`).join("")}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function toggleGroup(idx) {
+    const el = document.getElementById("group-"+idx);
+    const ch = document.getElementById("chevron-"+idx);
+    el.classList.toggle("hidden");
+    ch.classList.toggle("open");
+  }
+
+  function escHtml(str) { return String(str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  loadAll();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
@@ -10,541 +10,252 @@
   <title>TaskSync</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f2f2f7;
-      color: #1c1c1e;
-      min-height: 100vh;
+      background: #f2f2f7; color: #1c1c1e; min-height: 100vh;
       padding-top: calc(44px + env(safe-area-inset-top) + 16px);
       padding-bottom: calc(49px + env(safe-area-inset-bottom) + 16px);
       padding-left: max(16px, env(safe-area-inset-left));
       padding-right: max(16px, env(safe-area-inset-right));
       overscroll-behavior: none;
     }
-
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #6e6e73;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      margin-bottom: 6px;
-      margin-top: 14px;
-    }
-
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    label { display: block; font-size: 13px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; margin-top: 14px; }
     label:first-child { margin-top: 0; }
-
-    input, textarea, select {
-      width: 100%;
-      font-size: 16px;
-      padding: 10px 12px;
-      border: 1px solid #d1d1d6;
-      border-radius: 8px;
-      background: #f9f9fb;
-      color: #1c1c1e;
-      appearance: none;
-      -webkit-appearance: none;
-    }
-
+    input, textarea, select { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid #d1d1d6; border-radius: 8px; background: #f9f9fb; color: #1c1c1e; appearance: none; -webkit-appearance: none; }
     textarea { resize: vertical; min-height: 80px; }
-
-    input:focus, textarea:focus, select:focus {
-      outline: none;
-      border-color: #007aff;
-      background: #fff;
-    }
-
-    .btn {
-      display: block;
-      width: 100%;
-      min-height: 44px;
-      padding: 12px 16px;
-      font-size: 17px;
-      font-weight: 600;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      text-align: center;
-      text-decoration: none;
-    }
-
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #007aff; background: #fff; }
+    .btn { display: block; width: 100%; min-height: 44px; padding: 12px 16px; font-size: 17px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; text-align: center; text-decoration: none; }
     .btn-primary { background: #007aff; color: #fff; }
     .btn-primary:disabled { background: #a0c4ff; cursor: not-allowed; }
     .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
     .btn-success { background: #34c759; color: #fff; }
-    .btn-download { background: #5856d6; color: #fff; }
-
-    .slots-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-
-    .slot-chip {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: #e5e5ea;
-      border-radius: 20px;
-      padding: 4px 10px;
-      font-size: 14px;
-    }
-
-    .slot-chip button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-      color: #6e6e73;
-      padding: 0 2px;
-      min-height: 0;
-    }
-
-    .add-slot-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
+    .btn-success:disabled { background: #a0e0b5; cursor: not-allowed; }
+    .slots-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .slot-chip { display: flex; align-items: center; gap: 4px; background: #e5e5ea; border-radius: 20px; padding: 4px 10px; font-size: 14px; }
+    .slot-chip button { background: none; border: none; cursor: pointer; font-size: 16px; line-height: 1; color: #6e6e73; padding: 0 2px; min-height: 0; }
+    .add-slot-row { display: flex; gap: 8px; margin-top: 8px; }
     .add-slot-row input { flex: 1; }
-    .add-slot-row button {
-      min-height: 44px;
-      padding: 0 16px;
-      font-size: 15px;
-      font-weight: 600;
-      background: #007aff;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    .subtask-card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-
-    .subtask-card .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .subtask-num {
-      font-size: 12px;
-      font-weight: 700;
-      color: #007aff;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .delete-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 20px;
-      color: #ff3b30;
-      min-height: 44px;
-      min-width: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .row-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .error-box {
-      background: #fff2f2;
-      border: 1px solid #ffb3b3;
-      border-radius: 8px;
-      padding: 12px;
-      color: #c0392b;
-      font-size: 14px;
-      margin-bottom: 12px;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-
+    .add-slot-row button { min-height: 44px; padding: 0 16px; font-size: 15px; font-weight: 600; background: #007aff; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    .subtask-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .subtask-card .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .subtask-num { font-size: 12px; font-weight: 700; color: #007aff; text-transform: uppercase; letter-spacing: 0.5px; }
+    .delete-btn { background: none; border: none; cursor: pointer; font-size: 20px; color: #ff3b30; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .error-box { background: #fff2f2; border: 1px solid #ffb3b3; border-radius: 8px; padding: 12px; color: #c0392b; font-size: 14px; margin-bottom: 12px; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .instructions {
-      background: #f0f8ff;
-      border-radius: 10px;
-      padding: 16px;
-      margin-top: 16px;
-    }
-
-    .instructions h3 {
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      color: #007aff;
-    }
-
-    .instructions ol {
-      padding-left: 18px;
-      font-size: 14px;
-      line-height: 1.7;
-      color: #3a3a3c;
-    }
-
     .hidden { display: none !important; }
-
-    .section-title {
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-
-    .section-sub {
-      font-size: 13px;
-      color: #6e6e73;
-      margin-bottom: 16px;
-    }
-
-    .back-link {
-      display: inline-block;
-      color: #007aff;
-      font-size: 15px;
-      margin-bottom: 16px;
-      cursor: pointer;
-      min-height: 44px;
-      line-height: 44px;
-    }
-
-    .reorder-btn {
-      border: 1px solid #d1d1d6;
-      border-radius: 6px;
-      min-height: 32px;
-      min-width: 32px;
-      background: #f9f9fb;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .section-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .section-sub { font-size: 13px; color: #6e6e73; margin-bottom: 16px; }
+    .reorder-btn { border: 1px solid #d1d1d6; border-radius: 6px; min-height: 32px; min-width: 32px; background: #f9f9fb; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
     .reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    /* ── iOS Navigation Bar ── */
-    .nav-bar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: calc(44px + env(safe-area-inset-top));
-      padding-top: env(safe-area-inset-top);
-      background: rgba(242, 242, 247, 0.92);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
-      backdrop-filter: saturate(180%) blur(20px);
-      border-bottom: 0.5px solid rgba(60, 60, 67, 0.2);
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      z-index: 100;
-    }
-    .nav-title {
-      font-size: 17px;
-      font-weight: 600;
-      color: #1c1c1e;
-      padding-bottom: 11px;
-      max-width: 60%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .nav-back {
-      position: absolute;
-      left: 8px;
-      bottom: 0;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      color: #007aff;
-      font-size: 17px;
-      cursor: pointer;
-      padding: 0 8px;
-      gap: 2px;
-    }
+    /* Task list */
+    .chips-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .chip { padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid transparent; background: #e5e5ea; color: #3a3a3c; transition: background 0.15s; }
+    .chip.active { background: #007aff; color: #fff; border-color: #007aff; }
+    .task-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; }
+    .task-card:active { opacity: 0.8; }
+    .task-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+    .task-title { font-size: 16px; font-weight: 600; flex: 1; }
+    .status-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+    .status-pending { background: #f2f2f7; color: #6e6e73; }
+    .status-in-progress { background: #e5f0ff; color: #0055cc; }
+    .status-done { background: #e5ffe9; color: #1a7a2e; }
+    .status-archived { background: #f2f2f7; color: #aeaeb2; }
+    .progress-bar-wrap { background: #f2f2f7; border-radius: 4px; height: 6px; margin-bottom: 8px; overflow: hidden; }
+    .progress-bar-fill { background: #007aff; height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .task-meta { font-size: 12px; color: #aeaeb2; }
+    .empty-state { text-align: center; padding: 48px 16px; color: #aeaeb2; font-size: 15px; }
+    /* Nav bar */
+    .nav-bar { position: fixed; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid rgba(60,60,67,0.2); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
+    .nav-title { font-size: 17px; font-weight: 600; color: #1c1c1e; padding-bottom: 11px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nav-back { position: absolute; left: 8px; bottom: 0; height: 44px; display: flex; align-items: center; color: #007aff; font-size: 17px; cursor: pointer; padding: 0 8px; gap: 2px; border: none; background: none; }
     .nav-back-chevron { font-size: 22px; line-height: 1; margin-top: -1px; }
-    .nav-action {
-      position: absolute;
-      right: 8px;
-      bottom: 0;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      color: #007aff;
-      font-size: 17px;
-      cursor: pointer;
-      padding: 0 8px;
-      text-decoration: none;
-    }
-
-    /* ── iOS Tab Bar ── */
-    .tab-bar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: calc(49px + env(safe-area-inset-bottom));
-      padding-bottom: env(safe-area-inset-bottom);
-      background: rgba(242, 242, 247, 0.92);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
-      backdrop-filter: saturate(180%) blur(20px);
-      border-top: 0.5px solid rgba(60, 60, 67, 0.2);
-      display: flex;
-      z-index: 100;
-    }
-    .tab-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      cursor: pointer;
-      text-decoration: none;
-      color: #8e8e93;
-      font-size: 10px;
-      font-weight: 500;
-      padding-top: 6px;
-    }
+    .nav-action { position: absolute; right: 8px; bottom: 0; height: 44px; display: flex; align-items: center; color: #007aff; font-size: 17px; cursor: pointer; padding: 0 8px; font-weight: 600; border: none; background: none; }
+    /* Tab bar */
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: calc(49px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid rgba(60,60,67,0.2); display: flex; z-index: 100; }
+    .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; text-decoration: none; color: #8e8e93; font-size: 10px; font-weight: 500; padding-top: 6px; }
     .tab-item.active { color: #007aff; }
     .tab-icon { font-size: 24px; line-height: 1; }
-
-    /* ── Dark Mode ── */
+    /* Dark mode */
     @media (prefers-color-scheme: dark) {
       body { background: #000; color: #fff; }
-      .nav-bar, .tab-bar { background: rgba(28, 28, 30, 0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-bar, .tab-bar { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.15); }
       .nav-title { color: #fff; }
-      .card { background: #1c1c1e; }
-      .subtask-card { background: #1c1c1e; }
+      .card, .subtask-card, .task-card { background: #1c1c1e; }
       label { color: #8e8e93; }
       input, textarea, select { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
       input:focus, textarea:focus, select:focus { background: #3a3a3c; border-color: #007aff; }
       .btn-secondary { background: #2c2c2e; color: #fff; }
       .slot-chip { background: #2c2c2e; color: #fff; }
       .reorder-btn { background: #2c2c2e; border-color: #3a3a3c; color: #fff; }
-      .instructions { background: #1c1c1e; }
       .error-box { background: #2c0000; border-color: #7a0000; color: #ff6b6b; }
+      .chip { background: #2c2c2e; color: #ebebf5; }
+      .chip.active { background: #007aff; color: #fff; }
+      .progress-bar-wrap { background: #2c2c2e; }
+      .status-pending { background: #2c2c2e; color: #8e8e93; }
+      .status-in-progress { background: #1a2a4a; color: #5b9cf6; }
+      .status-done { background: #1a3a22; color: #4cd964; }
     }
-
   </style>
   <script src="/static/api-config.js"></script>
 </head>
 <body>
-
 <nav class="nav-bar">
   <button class="nav-back hidden" id="navBack" onclick="navGoBack()">
-    <span class="nav-back-chevron">‹</span><span>Back</span>
+    <span class="nav-back-chevron">‹</span><span id="navBackLabel">任务</span>
   </button>
   <div class="nav-title" id="navTitle">TaskSync</div>
-  <a class="nav-action" href="/knowledge" id="navAction">知识库</a>
+  <button class="nav-action" id="navAdd" onclick="showDecompose()" aria-label="新建任务" style="font-size:26px;font-weight:300">+</button>
   <button class="nav-btn-settings" style="right:52px" onclick="openSettingsModal({apiKey:'apiKey',baseUrl:'baseUrl',modelName:'modelName'})" aria-label="设置"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </nav>
+<!-- STATE: list -->
+<div id="stateList">
+  <div class="chips-row" id="filterChips"></div>
+  <div id="tasksList"></div>
+</div>
 
-<!-- STATE 1: Input Form -->
-<div id="state1">
+<!-- STATE: decompose -->
+<div id="stateDecompose" class="hidden">
   <div class="card">
     <label>API Key</label>
     <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
-
     <label>API Base URL</label>
     <input type="url" id="baseUrl" placeholder="https://api.example.com/v1" autocomplete="off">
-
     <label>Model Name</label>
     <input type="text" id="modelName" placeholder="claude-sonnet-4-5" value="claude-sonnet-4-5" autocomplete="off">
-
-    <label>Your Main Task</label>
-    <textarea id="taskInput" placeholder="e.g. Learn Spanish to conversational level"></textarea>
-
-    <label>Duration (weeks)</label>
+    <label>任务目标</label>
+    <textarea id="taskInput" placeholder="例如：学西班牙语到日常对话水平"></textarea>
+    <label>计划周数</label>
     <select id="weeksInput">
-      <option value="1">1 week</option>
-      <option value="2" selected>2 weeks</option>
-      <option value="4">4 weeks</option>
-      <option value="8">8 weeks</option>
-      <option value="12">12 weeks</option>
+      <option value="1">1 周</option>
+      <option value="2" selected>2 周</option>
+      <option value="4">4 周</option>
+      <option value="8">8 周</option>
+      <option value="12">12 周</option>
     </select>
-
-    <label>Start Date</label>
+    <label>开始日期</label>
     <input type="date" id="startDate">
-
-    <label>Daily Time Slots</label>
+    <label>每日时间段</label>
     <div class="slots-row" id="slotsContainer"></div>
     <div class="add-slot-row">
       <input type="time" id="newSlotTime" value="09:00">
-      <button onclick="addSlot()">+ Add</button>
+      <button onclick="addSlot()">+ 添加</button>
     </div>
   </div>
-
   <div id="error1" class="error-box hidden"></div>
-
-  <button class="btn btn-primary" id="decomposeBtn" onclick="decompose()">
-    Generate Subtasks
-  </button>
+  <button class="btn btn-primary" id="decomposeBtn" onclick="decompose()">AI 分解任务</button>
 </div>
 
-<!-- STATE 2: Review Subtasks -->
-<div id="state2" class="hidden">
-  <div class="section-title">Review Subtasks</div>
-  <p class="section-sub">Edit, reorder, or delete tasks before scheduling.</p>
-
+<!-- STATE: review -->
+<div id="stateReview" class="hidden">
+  <div class="section-title">审核子任务</div>
+  <p class="section-sub">编辑、排序或删除子任务后保存。</p>
   <div id="subtasksContainer"></div>
-
-  <button class="btn btn-secondary" style="margin-bottom:10px" onclick="addSubtask()">+ Add Subtask</button>
-
+  <button class="btn btn-secondary" style="margin-bottom:10px" onclick="addSubtask()">+ 添加子任务</button>
   <div id="error2" class="error-box hidden"></div>
-
-  <button class="btn btn-success" id="generateBtn" onclick="generateIcs()">
-    Generate Calendar (.ics)
-  </button>
-</div>
-
-<!-- STATE 3: Download -->
-<div id="state3" class="hidden">
-  <div class="section-title">Ready to Import</div>
-  <p class="section-sub">Your calendar file is ready.</p>
-
-  <div class="card" style="text-align:center; padding: 32px 20px;">
-    <div style="font-size:48px; margin-bottom:12px;">&#128197;</div>
-    <p style="font-size:16px; margin-bottom:20px; color:#3a3a3c;">
-      Tap the button below to download your <strong>.ics</strong> file.
-    </p>
-    <a id="downloadLink" class="btn btn-download" href="#" download>
-      Download .ics File
-    </a>
-  </div>
-
-  <div class="instructions">
-    <h3>Import to Apple Calendar (iOS)</h3>
-    <ol>
-      <li>Tap "Download .ics File" above</li>
-      <li>In the share sheet, tap <strong>Open in Calendar</strong></li>
-      <li>Tap <strong>Add All</strong> to import all events</li>
-      <li>Open Calendar app to see your schedule</li>
-    </ol>
-  </div>
+  <button class="btn btn-success" id="saveTaskBtn" onclick="saveTask()">保存任务</button>
 </div>
 
 <nav class="tab-bar">
   <div class="tab-item active">
-    <span class="tab-icon">📅</span>
-    <span>任务</span>
+    <span class="tab-icon">📅</span><span>任务</span>
   </div>
   <a class="tab-item" href="/knowledge">
-    <span class="tab-icon">📚</span>
-    <span>知识库</span>
+    <span class="tab-icon">📚</span><span>知识库</span>
+  </a>
+  <a class="tab-item" href="/insights">
+    <span class="tab-icon">📊</span><span>洞察</span>
   </a>
 </nav>
-
 <script>
-  // App state
+  let currentState = "list";
+  let allTasks = [];
+  let currentFilter = "all";
   let slots = ["09:00"];
   let currentSubtasks = [];
   let formData = {};
-  let apiKeyMem = "";
   let totalDays = 0;
-  let currentStateNum = 1;
 
-  const NAV_TITLES = { 1: "TaskSync", 2: "Review Subtasks", 3: "Ready to Import" };
-
-  function setState(n) {
-    currentStateNum = n;
-    [1, 2, 3].forEach(i => {
-      document.getElementById("state" + i).classList.toggle("hidden", i !== n);
+  function setState(name) {
+    currentState = name;
+    ["List","Decompose","Review"].forEach(s => {
+      const el = document.getElementById("state" + s);
+      if (el) el.classList.toggle("hidden", "state" + s !== "state" + name.charAt(0).toUpperCase() + name.slice(1));
     });
-    document.getElementById("navTitle").textContent = NAV_TITLES[n] || "TaskSync";
-    document.getElementById("navBack").classList.toggle("hidden", n === 1);
-    document.getElementById("navAction").classList.toggle("hidden", n !== 1);
+    const titles = { list:"TaskSync", decompose:"新建任务", review:"审核子任务" };
+    document.getElementById("navTitle").textContent = titles[name] || "TaskSync";
+    document.getElementById("navBack").classList.toggle("hidden", name === "list");
+    document.getElementById("navAdd").classList.toggle("hidden", name !== "list");
+    if (name === "review") document.getElementById("navBackLabel").textContent = "新建任务";
+    else document.getElementById("navBackLabel").textContent = "任务";
   }
 
   function navGoBack() {
-    if (currentStateNum > 1) setState(currentStateNum - 1);
+    if (currentState === "review") setState("decompose");
+    else if (currentState === "decompose") setState("list");
   }
 
-  function goBack(n) { setState(n); }
+  function showDecompose() { setState("decompose"); }
 
-  // Init
-  (function init() {
-    const today = new Date().toISOString().split("T")[0];
-    document.getElementById("startDate").value = today;
-    renderSlots();
-    fillApiConfigInputs({ apiKey: "apiKey", baseUrl: "baseUrl", modelName: "modelName" });
-  })();
+  async function loadTasks() {
+    try {
+      const res = await fetch("/api/tasks");
+      allTasks = await res.json();
+    } catch(e) { allTasks = []; }
+    renderTasks();
+  }
 
+  function renderTasks() {
+    const filtered = currentFilter === "all" ? allTasks : allTasks.filter(t => t.status === currentFilter);
+    const container = document.getElementById("tasksList");
+    if (!filtered.length) {
+      const msg = currentFilter === "all" ? "暂无任务，点击右上角 + 开始" : "暂无符合条件的任务";
+      container.innerHTML = `<div class="empty-state">${msg}</div>`;
+      return;
+    }
+    container.innerHTML = filtered.map(t => {
+      const total = (t.subtasks||[]).length;
+      const done = (t.subtasks||[]).filter(s => s.status === "done").length;
+      const pct = total > 0 ? Math.round(done/total*100) : 0;
+      const labels = { pending:"待开始", in_progress:"进行中", done:"已完成", archived:"已归档" };
+      const cls = { pending:"status-pending", in_progress:"status-in-progress", done:"status-done", archived:"status-archived" };
+      return `<div class="task-card" onclick="location.href='/tasks/${t.id}'">
+        <div class="task-card-header">
+          <div class="task-title">${escHtml(t.title)}</div>
+          <span class="status-badge ${cls[t.status]||''}">${labels[t.status]||t.status}</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <div class="task-meta">${done}/${total} 子任务完成 · ${fmtDate(t.created_at)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function setFilter(f) { currentFilter = f; renderFilterChips(); renderTasks(); }
+
+  function renderFilterChips() {
+    const chips = [{key:"all",label:"全部"},{key:"in_progress",label:"进行中"},{key:"done",label:"已完成"}];
+    document.getElementById("filterChips").innerHTML = chips.map(c =>
+      `<span class="chip ${currentFilter===c.key?'active':''}" onclick="setFilter('${c.key}')">${c.label}</span>`
+    ).join("");
+  }
+  // Slots
   function renderSlots() {
-    const container = document.getElementById("slotsContainer");
-    container.innerHTML = slots.map((s, i) => `
-      <div class="slot-chip">
-        ${s}
-        <button onclick="removeSlot(${i})" aria-label="Remove ${s}">&#215;</button>
-      </div>
-    `).join("");
+    document.getElementById("slotsContainer").innerHTML = slots.map((s,i) =>
+      `<div class="slot-chip">${s}<button onclick="removeSlot(${i})" aria-label="删除">&#215;</button></div>`
+    ).join("");
   }
-
   function addSlot() {
     const val = document.getElementById("newSlotTime").value;
-    if (!/^\d{2}:\d{2}$/.test(val)) {
-      showError("error1", "时间格式无效，请使用 HH:MM 格式");
-      return;
-    }
-    const [h, m] = val.split(":").map(Number);
-    if (h > 23 || m > 59) {
-      showError("error1", `时间槽超出范围：${val}`);
-      return;
-    }
-    if (!slots.includes(val)) {
-      slots.push(val);
-      slots.sort();
-      renderSlots();
-    }
+    if (!/^\d{2}:\d{2}$/.test(val)) return showError("error1","时间格式无效");
+    const [h,m] = val.split(":").map(Number);
+    if (h>23||m>59) return showError("error1","时间超出范围");
+    if (!slots.includes(val)) { slots.push(val); slots.sort(); renderSlots(); }
   }
+  function removeSlot(i) { if (slots.length>1) { slots.splice(i,1); renderSlots(); } }
 
-  function removeSlot(i) {
-    if (slots.length > 1) {
-      slots.splice(i, 1);
-      renderSlots();
-    }
-  }
-
-  function showError(id, msg) {
-    const el = document.getElementById(id);
-    el.textContent = msg;
-    el.classList.remove("hidden");
-  }
-
-  function hideError(id) {
-    document.getElementById(id).classList.add("hidden");
-  }
-
+  // Decompose
   async function decompose() {
     hideError("error1");
     const apiKey = document.getElementById("apiKey").value.trim();
@@ -553,168 +264,100 @@
     const task = document.getElementById("taskInput").value.trim();
     const weeks = parseInt(document.getElementById("weeksInput").value);
     const startDate = document.getElementById("startDate").value;
-
-    if (!apiKey) return showError("error1", "Please enter your API key.");
-    if (!task) return showError("error1", "Please describe your main task.");
-    if (!startDate) return showError("error1", "Please select a start date.");
-
-    collectAndSaveApiConfig({ apiKey: "apiKey", baseUrl: "baseUrl", modelName: "modelName" });
-    apiKeyMem = apiKey;
-    formData = { base_url: baseUrl, model: modelName, task, weeks, start_date: startDate, daily_slots: [...slots] };
-
+    if (!apiKey) return showError("error1","请填写 API Key");
+    if (!task) return showError("error1","请描述你的任务目标");
+    if (!startDate) return showError("error1","请选择开始日期");
+    collectAndSaveApiConfig({apiKey:"apiKey",baseUrl:"baseUrl",modelName:"modelName"});
+    formData = {base_url:baseUrl, model:modelName, task, weeks, start_date:startDate, daily_slots:[...slots]};
     const btn = document.getElementById("decomposeBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Generating...';
-
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>生成中…';
     try {
-      const res = await fetch("/api/decompose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKeyMem, ...formData }),
-      });
+      const res = await fetch("/api/decompose",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({api_key:apiKey,...formData})});
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Unknown error");
-
+      if (!res.ok) throw new Error(json.error||"未知错误");
       currentSubtasks = json.subtasks;
       totalDays = weeks * 7;
-      // Clear API key from memory after use
-      apiKeyMem = "";
       document.getElementById("apiKey").value = "";
-
       renderSubtasks();
-      setState(2);
-    } catch (e) {
-      showError("error1", "Error: " + e.message);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = "Generate Subtasks";
-    }
+      setState("review");
+    } catch(e) { showError("error1","错误："+e.message); }
+    finally { btn.disabled=false; btn.innerHTML="AI 分解任务"; }
   }
 
+  // Subtasks
   function renderSubtasks() {
-    const container = document.getElementById("subtasksContainer");
-    container.innerHTML = currentSubtasks.map((s, i) => `
+    document.getElementById("subtasksContainer").innerHTML = currentSubtasks.map((s,i) => `
       <div class="subtask-card" id="subtask-${i}">
         <div class="card-header">
-          <span class="subtask-num">Task ${i + 1}</span>
+          <span class="subtask-num">子任务 ${i+1}</span>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button class="reorder-btn" onclick="moveSubtask(${i},-1)" ${i===0?'disabled':''} aria-label="上移">▲</button>
-            <button class="reorder-btn" onclick="moveSubtask(${i},1)" ${i===currentSubtasks.length-1?'disabled':''} aria-label="下移">▼</button>
-            <button class="delete-btn" onclick="deleteSubtask(${i})" aria-label="Delete task ${i+1}">&#215;</button>
+            <button class="reorder-btn" onclick="moveSubtask(${i},-1)" ${i===0?'disabled':''}>▲</button>
+            <button class="reorder-btn" onclick="moveSubtask(${i},1)" ${i===currentSubtasks.length-1?'disabled':''}>▼</button>
+            <button class="delete-btn" onclick="deleteSubtask(${i})">&#215;</button>
           </div>
         </div>
-        <label>Title</label>
+        <label>标题</label>
         <input type="text" value="${escHtml(s.title)}" oninput="updateSubtask(${i},'title',this.value)">
-        <label>Description</label>
+        <label>描述</label>
         <textarea oninput="updateSubtask(${i},'description',this.value)">${escHtml(s.description)}</textarea>
         <div class="row-2">
-          <div>
-            <label>Duration (min)</label>
+          <div><label>时长（分钟）</label>
             <select onchange="updateSubtask(${i},'duration_minutes',parseInt(this.value))">
-              ${[15,30,45,60].map(v => `<option value="${v}" ${s.duration_minutes==v?'selected':''}>${v} min</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label>Day Offset</label>
+              ${[15,30,45,60].map(v=>`<option value="${v}" ${s.duration_minutes==v?'selected':''}>${v} 分钟</option>`).join('')}
+            </select></div>
+          <div><label>第几天</label>
             <input type="number" min="0" max="${totalDays||''}" value="${s.suggested_day_offset}"
-              oninput="updateSubtask(${i},'suggested_day_offset',parseInt(this.value)||0); validateOffset(${i},this)">
-          </div>
+              oninput="updateSubtask(${i},'suggested_day_offset',parseInt(this.value)||0)"></div>
         </div>
-      </div>
-    `).join("");
+      </div>`).join("");
   }
-
-  function escHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function updateSubtask(i, field, value) {
-    currentSubtasks[i][field] = value;
-  }
-
-  function deleteSubtask(i) {
-    currentSubtasks.splice(i, 1);
-    renderSubtasks();
-  }
-
+  function updateSubtask(i,field,value) { currentSubtasks[i][field]=value; }
+  function deleteSubtask(i) { currentSubtasks.splice(i,1); renderSubtasks(); }
   function addSubtask() {
-    currentSubtasks.push({
-      title: "New Task",
-      description: "",
-      duration_minutes: 30,
-      suggested_day_offset: 0,
-    });
+    currentSubtasks.push({title:"新子任务",description:"",duration_minutes:30,suggested_day_offset:0});
     renderSubtasks();
-    // Scroll to new card
-    const cards = document.querySelectorAll(".subtask-card");
-    cards[cards.length - 1].scrollIntoView({ behavior: "smooth" });
+    document.querySelectorAll(".subtask-card")[currentSubtasks.length-1].scrollIntoView({behavior:"smooth"});
   }
-
-  function moveSubtask(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= currentSubtasks.length) return;
-    [currentSubtasks[i], currentSubtasks[j]] = [currentSubtasks[j], currentSubtasks[i]];
+  function moveSubtask(i,dir) {
+    const j=i+dir;
+    if (j<0||j>=currentSubtasks.length) return;
+    [currentSubtasks[i],currentSubtasks[j]]=[currentSubtasks[j],currentSubtasks[i]];
     renderSubtasks();
   }
 
-  function validateOffset(i, input) {
-    const val = parseInt(input.value) || 0;
-    if (totalDays > 0 && val > totalDays) {
-      input.style.borderColor = "#ff9500";
-      input.title = `偏移超出计划天数 (${totalDays} 天)`;
-    } else {
-      input.style.borderColor = "";
-      input.title = "";
-    }
-  }
-
-  async function generateIcs() {
+  async function saveTask() {
     hideError("error2");
-    if (currentSubtasks.length === 0) {
-      return showError("error2", "Add at least one subtask.");
-    }
-
-    const btn = document.getElementById("generateBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Generating...';
-
+    if (!currentSubtasks.length) return showError("error2","请至少添加一个子任务");
+    const btn = document.getElementById("saveTaskBtn");
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>保存中…';
     try {
-      const res = await fetch("/api/generate-ics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subtasks: currentSubtasks,
-          start_date: formData.start_date,
-          daily_slots: formData.daily_slots,
-          task_title: formData.task,
-        }),
-      });
-
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error || "Unknown error");
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.getElementById("downloadLink");
-      link.href = url;
-
-      const safeName = (formData.task || "tasks").replace(/[^a-z0-9]/gi, "_").slice(0, 40);
-      link.download = safeName + ".ics";
-
-      setState(3);
-    } catch (e) {
-      showError("error2", "Error: " + e.message);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = "Generate Calendar (.ics)";
-    }
+      const payload = {
+        title: formData.task,
+        weeks: formData.weeks,
+        start_date: formData.start_date,
+        daily_slots: formData.daily_slots,
+        subtasks: currentSubtasks,
+      };
+      const res = await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error||"保存失败");
+      window.location.href = "/tasks/" + json.id;
+    } catch(e) { showError("error2","错误："+e.message); }
+    finally { btn.disabled=false; btn.innerHTML="保存任务"; }
   }
+
+  function showError(id,msg) { const el=document.getElementById(id); el.textContent=msg; el.classList.remove("hidden"); }
+  function hideError(id) { document.getElementById(id).classList.add("hidden"); }
+  function escHtml(str) { return String(str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function fmtDate(iso) { if (!iso) return ""; return new Date(iso).toLocaleDateString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit"}); }
+
+  (function init() {
+    document.getElementById("startDate").value = new Date().toISOString().split("T")[0];
+    renderSlots();
+    renderFilterChips();
+    loadTasks();
+    fillApiConfigInputs({apiKey:"apiKey",baseUrl:"baseUrl",modelName:"modelName"});
+  })();
 </script>
 </body>
-</html>
+</html></script>

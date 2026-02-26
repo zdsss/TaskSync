@@ -536,6 +536,10 @@
     <span class="tab-icon">📚</span>
     <span>知识库</span>
   </div>
+  <a class="tab-item" href="/insights">
+    <span class="tab-icon">📊</span>
+    <span>洞察</span>
+  </a>
 </nav>
 
 <script>
@@ -553,6 +557,8 @@
   let formTags = [];
   let searchTimer = null;
   let aiOpen = false;
+  let formSourceTaskId = null;
+  let formSourceSubtaskId = null;
 
   // ── Init ──────────────────────────────────────────────────────────────────
   renderTypeChips();
@@ -566,6 +572,13 @@
   });
   loadTagCloud();
   fillApiConfigInputs({ apiKey: "aiApiKey", baseUrl: "aiBaseUrl", modelName: "aiModel" });
+  // Pre-fill from URL params (e.g. from task_detail.html)
+  const _urlParams = new URLSearchParams(location.search);
+  if (_urlParams.get("source_task_id")) {
+    formSourceTaskId = _urlParams.get("source_task_id");
+    formSourceSubtaskId = _urlParams.get("source_subtask_id") || null;
+    showForm(null);
+  }
 
   function renderTypeChips() {
     const row = document.getElementById("typeChips");
@@ -639,6 +652,12 @@
   function showForm(entry) {
     editingId = entry ? entry.id : null;
     formTags = entry ? [...(entry.tags || [])] : [];
+    if (!entry) {
+      // only keep source ids when opening a fresh form (not editing)
+    } else {
+      formSourceTaskId = null;
+      formSourceSubtaskId = null;
+    }
     const title = entry ? "编辑条目" : "新建条目";
     document.getElementById("navTitle").textContent = title;
     document.getElementById("navBack").classList.remove("hidden");
@@ -743,6 +762,8 @@
       source_url: document.getElementById("fSourceUrl").value.trim(),
       tags: formTags,
     };
+    if (formSourceTaskId) payload.source_task_id = formSourceTaskId;
+    if (formSourceSubtaskId) payload.source_subtask_id = formSourceSubtaskId;
 
     const btn = document.getElementById("saveBtn");
     btn.disabled = true;
