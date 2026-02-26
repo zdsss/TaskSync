@@ -51,6 +51,7 @@ def create_task(task_data: dict) -> dict:
             st["id"] = f"st_{uuid.uuid4().hex[:8]}"
         st.setdefault("status", "pending")
         st.setdefault("completed_at", None)
+        st.setdefault("scheduled_at", None)
     data["tasks"].append(task_data)
     _save(data)
     return task_data

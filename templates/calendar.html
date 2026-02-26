@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <title>日历 — TaskSync</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f2f2f7; color: #1c1c1e; overflow: hidden; }
+    .hidden { display: none !important; }
+
+    /* Nav bar */
+    .nav-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: calc(44px + env(safe-area-inset-top));
+      padding-top: env(safe-area-inset-top);
+      background: rgba(242,242,247,0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(60,60,67,0.2);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 100;
+    }
+    .nav-title { font-size: 15px; font-weight: 600; color: #1c1c1e; padding-bottom: 11px; }
+    .nav-prev, .nav-next {
+      position: absolute; bottom: 0; height: 44px;
+      display: flex; align-items: center;
+      color: #007aff; font-size: 22px; cursor: pointer;
+      padding: 0 12px; border: none; background: none;
+    }
+    .nav-prev { left: 0; }
+    .nav-next { right: 44px; }
+    .nav-today {
+      position: absolute; right: 0; bottom: 0; height: 44px;
+      display: flex; align-items: center;
+      color: #007aff; font-size: 14px; font-weight: 600;
+      padding: 0 12px; border: none; background: none; cursor: pointer;
+    }
+
+    /* Day header row */
+    .cal-header {
+      position: fixed;
+      top: calc(44px + env(safe-area-inset-top));
+      left: 0; right: 0; height: 44px;
+      display: grid;
+      grid-template-columns: 48px repeat(7, 1fr);
+      background: rgba(242,242,247,0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(60,60,67,0.12);
+      z-index: 90;
+    }
+    .cal-header-gutter { }
+    .cal-header-day {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 11px; color: #6e6e73; font-weight: 500;
+      border-left: 0.5px solid rgba(60,60,67,0.08);
+    }
+    .cal-header-day .day-num {
+      font-size: 16px; font-weight: 600; color: #1c1c1e; line-height: 1.2;
+    }
+    .cal-header-day.today .day-num {
+      background: #007aff; color: #fff;
+      border-radius: 50%; width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Scrollable grid container */
+    .cal-scroll {
+      position: fixed;
+      top: calc(44px + env(safe-area-inset-top) + 44px);
+      bottom: calc(49px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Time grid: 24h × 60px = 1440px */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: 48px repeat(7, 1fr);
+      height: 1440px;
+      position: relative;
+    }
+
+    /* Hour labels */
+    .cal-time-col { position: relative; }
+    .cal-hour-label {
+      position: absolute; right: 6px;
+      font-size: 10px; color: #aeaeb2;
+      transform: translateY(-50%);
+      white-space: nowrap;
+    }
+
+    /* Day columns */
+    .cal-day-col {
+      position: relative;
+      border-left: 0.5px solid rgba(60,60,67,0.08);
+    }
+    .cal-day-col.today { background: rgba(0,122,255,0.03); }
+    .cal-day-col.drag-target { background: rgba(0,122,255,0.08); }
+
+    /* Hour lines */
+    .cal-hour-line {
+      position: absolute; left: 0; right: 0; height: 0;
+      border-top: 0.5px solid rgba(60,60,67,0.08);
+      pointer-events: none;
+    }
+    .cal-hour-line.half { border-top-style: dashed; opacity: 0.5; }
+
+    /* Event blocks */
+    .cal-event {
+      position: absolute;
+      left: 2px; right: 2px;
+      border-radius: 6px;
+      padding: 3px 5px;
+      font-size: 11px; font-weight: 600;
+      overflow: hidden;
+      cursor: pointer;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      color: #fff;
+      transition: opacity 0.15s;
+    }
+    .cal-event.is-computed { border: 1.5px dashed rgba(255,255,255,0.6); }
+    .cal-event.status-done { opacity: 0.4; }
+    .cal-event.dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.3); transform: scale(1.04); z-index: 50; opacity: 0.9; }
+
+    /* Current time line */
+    .cal-now-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: #ff3b30; z-index: 10; pointer-events: none;
+    }
+    .cal-now-dot {
+      position: absolute; left: -4px; top: -4px;
+      width: 10px; height: 10px;
+      border-radius: 50%; background: #ff3b30;
+    }
+
+    /* Tab bar */
+    .tab-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: calc(49px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(242,242,247,0.92);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      border-top: 0.5px solid rgba(60,60,67,0.2);
+      display: flex; z-index: 100;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2px; cursor: pointer; text-decoration: none;
+      color: #8e8e93; font-size: 10px; font-weight: 500; padding-top: 6px;
+    }
+    .tab-item.active { color: #007aff; }
+    .tab-icon { font-size: 24px; line-height: 1; }
+
+    /* Bottom sheet */
+    .sheet-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 200; opacity: 0; transition: opacity 0.25s; pointer-events: none;
+    }
+    .sheet-overlay.visible { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #fff; border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+      z-index: 201; transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    .sheet.visible { transform: translateY(0); }
+    .sheet-handle { width: 36px; height: 4px; background: #d1d1d6; border-radius: 2px; margin: 0 auto 16px; }
+    .sheet-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+    .sheet-meta { font-size: 13px; color: #6e6e73; margin-bottom: 12px; }
+    .sheet-desc { font-size: 14px; color: #3a3a3c; margin-bottom: 16px; line-height: 1.5; }
+    .sheet-btns { display: flex; gap: 10px; }
+    .btn { display: block; min-height: 44px; padding: 12px 16px; font-size: 17px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; text-align: center; text-decoration: none; }
+    .btn-primary { background: #007aff; color: #fff; }
+    .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+    .status-chip {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; margin-bottom: 12px;
+    }
+    .status-pending { background: #f2f2f7; color: #6e6e73; }
+    .status-done { background: #e5ffe9; color: #1a7a2e; }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      body { background: #000; color: #fff; }
+      .nav-bar, .tab-bar { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.15); }
+      .nav-title { color: #fff; }
+      .cal-header { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.1); }
+      .cal-header-day { color: #8e8e93; }
+      .cal-header-day .day-num { color: #fff; }
+      .cal-day-col { border-color: rgba(255,255,255,0.06); }
+      .cal-hour-line { border-color: rgba(255,255,255,0.06); }
+      .cal-hour-label { color: #636366; }
+      .sheet { background: #1c1c1e; }
+      .sheet-meta { color: #8e8e93; }
+      .sheet-desc { color: #ebebf5; }
+      .btn-secondary { background: #2c2c2e; color: #fff; }
+      .status-pending { background: #2c2c2e; color: #8e8e93; }
+      .status-done { background: #1a3a22; color: #4cd964; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav-bar">
+  <button class="nav-prev" id="btnPrev" onclick="shiftWeek(-1)">‹</button>
+  <div class="nav-title" id="navTitle"></div>
+  <button class="nav-next" id="btnNext" onclick="shiftWeek(1)">›</button>
+  <button class="nav-today" onclick="goToday()">今天</button>
+</nav>
+
+<div class="cal-header" id="calHeader">
+  <div class="cal-header-gutter"></div>
+</div>
+
+<div class="cal-scroll" id="calScroll">
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+
+<!-- Bottom sheet -->
+<div class="sheet-overlay hidden" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="sheet hidden" id="detailSheet">
+  <div class="sheet-handle"></div>
+  <div id="detailBody"></div>
+  <div class="sheet-btns">
+    <button class="btn btn-secondary" style="flex:1" onclick="closeDetail()">关闭</button>
+    <a class="btn btn-primary" style="flex:1;display:flex;align-items:center;justify-content:center;" id="detailLink">查看任务</a>
+  </div>
+</div>
+
+<nav class="tab-bar">
+  <a class="tab-item" href="/"><span class="tab-icon">📅</span><span>任务</span></a>
+  <div class="tab-item active"><span class="tab-icon">🗓</span><span>日历</span></div>
+  <a class="tab-item" href="/knowledge"><span class="tab-icon">📚</span><span>知识库</span></a>
+  <a class="tab-item" href="/insights"><span class="tab-icon">📊</span><span>洞察</span></a>
+</nav>
+
+<script>
+const HOUR_PX = 60;
+const SNAP_MIN = 15;
+const DAY_NAMES = ["周一","周二","周三","周四","周五","周六","周日"];
+const TASK_COLORS = ["#007aff","#34c759","#ff9500","#ff3b30","#af52de","#5ac8fa","#ffcc00","#ff2d55"];
+
+let currentWeekStart = getMonday(new Date());
+let weekEvents = [];
+let drag = null;
+
+function getMonday(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const m = new Date(d);
+  m.setDate(d.getDate() + diff);
+  m.setHours(0,0,0,0);
+  return m;
+}
+
+function pad(n) { return String(n).padStart(2,"0"); }
+
+function isoDate(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function timeToTop(isoStr) {
+  const d = new Date(isoStr);
+  return (d.getHours() + d.getMinutes() / 60) * HOUR_PX;
+}
+
+function durationToHeight(minutes) {
+  return Math.max(22, (minutes / 60) * HOUR_PX);
+}
+
+function taskColor(taskId) {
+  let h = 0;
+  for (let i = 0; i < taskId.length; i++) h = (h * 31 + taskId.charCodeAt(i)) >>> 0;
+  return TASK_COLORS[h % TASK_COLORS.length];
+}
+
+function layoutOverlaps(events) {
+  events.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
+  const cols = [];
+  for (const ev of events) {
+    const evStart = new Date(ev.scheduled_at).getTime();
+    const evEnd = evStart + ev.duration_minutes * 60000;
+    let placed = false;
+    for (let ci = 0; ci < cols.length; ci++) {
+      const lastEnd = new Date(cols[ci].scheduled_at).getTime() + cols[ci].duration_minutes * 60000;
+      if (evStart >= lastEnd) {
+        ev._col = ci; cols[ci] = ev; placed = true; break;
+      }
+    }
+    if (!placed) { ev._col = cols.length; cols.push(ev); }
+  }
+  const total = cols.length || 1;
+  events.forEach(ev => { ev._totalCols = total; });
+}
+
+function renderHeader() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const header = document.getElementById("calHeader");
+  header.innerHTML = '<div class="cal-header-gutter"></div>';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + i);
+    const isToday = d.getTime() === today.getTime();
+    const div = document.createElement("div");
+    div.className = "cal-header-day" + (isToday ? " today" : "");
+    div.innerHTML = `<span>${DAY_NAMES[i]}</span><span class="day-num">${d.getDate()}</span>`;
+    header.appendChild(div);
+  }
+
+  const ws = currentWeekStart;
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  const fmt = d => `${d.getMonth()+1}月${d.getDate()}日`;
+  document.getElementById("navTitle").textContent = `${ws.getFullYear()}年${fmt(ws)}–${fmt(we)}`;
+}
+
+function renderGrid() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+
+  // Time label column
+  const timeCol = document.createElement("div");
+  timeCol.className = "cal-time-col";
+  for (let h = 0; h <= 23; h++) {
+    const lbl = document.createElement("div");
+    lbl.className = "cal-hour-label";
+    lbl.style.top = (h * HOUR_PX) + "px";
+    lbl.textContent = h === 0 ? "" : `${pad(h)}:00`;
+    timeCol.appendChild(lbl);
+  }
+  grid.appendChild(timeCol);
+
+  // Group events by day index
+  const byDay = Array.from({length: 7}, () => []);
+  for (const ev of weekEvents) {
+    const evDate = new Date(ev.scheduled_at);
+    evDate.setHours(0,0,0,0);
+    const wsTime = currentWeekStart.getTime();
+    const dayIdx = Math.round((evDate.getTime() - wsTime) / 86400000);
+    if (dayIdx >= 0 && dayIdx < 7) byDay[dayIdx].push(ev);
+  }
+
+  // Render each day column
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + i);
+    const isToday = d.getTime() === today.getTime();
+
+    const col = document.createElement("div");
+    col.className = "cal-day-col" + (isToday ? " today" : "");
+    col.dataset.day = i;
+
+    // Hour lines
+    for (let h = 0; h <= 23; h++) {
+      const line = document.createElement("div");
+      line.className = "cal-hour-line";
+      line.style.top = (h * HOUR_PX) + "px";
+      col.appendChild(line);
+      if (h < 23) {
+        const half = document.createElement("div");
+        half.className = "cal-hour-line half";
+        half.style.top = (h * HOUR_PX + 30) + "px";
+        col.appendChild(half);
+      }
+    }
+
+    // Current time line (only in today's column)
+    if (isToday) {
+      const now = new Date();
+      const nowLine = document.createElement("div");
+      nowLine.className = "cal-now-line";
+      nowLine.id = "nowLine";
+      nowLine.style.top = ((now.getHours() + now.getMinutes()/60) * HOUR_PX) + "px";
+      const dot = document.createElement("div");
+      dot.className = "cal-now-dot";
+      nowLine.appendChild(dot);
+      col.appendChild(nowLine);
+    }
+
+    // Layout overlapping events
+    const dayEvs = byDay[i];
+    layoutOverlaps(dayEvs);
+
+    for (const ev of dayEvs) {
+      const top = timeToTop(ev.scheduled_at);
+      const height = durationToHeight(ev.duration_minutes);
+      const colW = 1 / ev._totalCols;
+      const leftPct = ev._col * colW * 100;
+      const widthPct = colW * 100;
+
+      const el = document.createElement("div");
+      el.className = "cal-event" +
+        (ev.is_computed ? " is-computed" : "") +
+        (ev.status === "done" ? " status-done" : "");
+      el.style.cssText = `top:${top}px;height:${height}px;background:${taskColor(ev.task_id)};left:calc(${leftPct}% + 2px);width:calc(${widthPct}% - 4px);`;
+      el.innerHTML = `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escHtml(ev.title)}</div>`;
+
+      el.addEventListener("click", e => { e.stopPropagation(); openDetail(ev); });
+      initDrag(el, ev);
+      col.appendChild(el);
+    }
+
+    grid.appendChild(col);
+  }
+}
+
+function renderWeek() {
+  renderHeader();
+  renderGrid();
+}
+
+async function loadWeek() {
+  const start = isoDate(currentWeekStart);
+  try {
+    const res = await fetch(`/api/calendar/week?start=${start}`);
+    const data = await res.json();
+    weekEvents = data.events || [];
+  } catch(e) { weekEvents = []; }
+  renderWeek();
+  scrollToNow();
+}
+
+function scrollToNow() {
+  const now = new Date();
+  const top = Math.max(0, (now.getHours() + now.getMinutes()/60) * HOUR_PX - 120);
+  document.getElementById("calScroll").scrollTop = top;
+}
+
+function shiftWeek(dir) {
+  currentWeekStart = new Date(currentWeekStart);
+  currentWeekStart.setDate(currentWeekStart.getDate() + dir * 7);
+  loadWeek();
+}
+
+function goToday() {
+  currentWeekStart = getMonday(new Date());
+  loadWeek();
+}
+
+// Detail sheet
+function openDetail(ev) {
+  const statusLabels = { pending:"待完成", done:"已完成", in_progress:"进行中" };
+  const statusCls = { pending:"status-pending", done:"status-done", in_progress:"status-in-progress" };
+  const d = new Date(ev.scheduled_at);
+  const timeStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  document.getElementById("detailBody").innerHTML = `
+    <div class="sheet-title">${escHtml(ev.title)}</div>
+    <span class="status-chip ${statusCls[ev.status]||'status-pending'}">${statusLabels[ev.status]||ev.status}</span>
+    <div class="sheet-meta">📋 ${escHtml(ev.task_title)} · ${timeStr} · ${ev.duration_minutes} 分钟${ev.is_computed ? ' · 计算时间' : ''}</div>
+    ${ev.description ? `<div class="sheet-desc">${escHtml(ev.description)}</div>` : ""}
+  `;
+  document.getElementById("detailLink").href = `/tasks/${ev.task_id}`;
+  document.getElementById("detailOverlay").classList.remove("hidden");
+  document.getElementById("detailSheet").classList.remove("hidden");
+  requestAnimationFrame(() => {
+    document.getElementById("detailOverlay").classList.add("visible");
+    document.getElementById("detailSheet").classList.add("visible");
+  });
+}
+
+function closeDetail() {
+  document.getElementById("detailOverlay").classList.remove("visible");
+  document.getElementById("detailSheet").classList.remove("visible");
+  setTimeout(() => {
+    document.getElementById("detailOverlay").classList.add("hidden");
+    document.getElementById("detailSheet").classList.add("hidden");
+  }, 300);
+}
+
+// Drag & drop
+function initDrag(el, ev) {
+  el.addEventListener("touchstart", e => {
+    e.preventDefault();
+    const ghost = el.cloneNode(true);
+    ghost.classList.add("dragging");
+    ghost.style.cssText += `;position:fixed;width:${el.getBoundingClientRect().width}px;pointer-events:none;z-index:999;`;
+    document.body.appendChild(ghost);
+    el.style.opacity = "0.25";
+    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined };
+  }, { passive: false });
+
+  el.addEventListener("touchmove", e => {
+    if (!drag || drag.el !== el) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    drag.ghost.style.left = (t.clientX - drag.ghost.offsetWidth / 2) + "px";
+    drag.ghost.style.top = (t.clientY - 20) + "px";
+
+    const grid = document.getElementById("calGrid");
+    const rect = grid.getBoundingClientRect();
+    const scrollTop = document.getElementById("calScroll").scrollTop;
+    const colW = (rect.width - 48) / 7;
+    const relX = t.clientX - rect.left - 48;
+    const dayIdx = Math.max(0, Math.min(6, Math.floor(relX / colW)));
+    const relY = t.clientY - rect.top + scrollTop;
+    const rawMin = (relY / HOUR_PX) * 60;
+    const snapped = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
+
+    drag.previewDay = dayIdx;
+    drag.previewMin = snapped;
+
+    document.querySelectorAll(".cal-day-col[data-day]").forEach((c, i) => {
+      c.classList.toggle("drag-target", i === dayIdx);
+    });
+  }, { passive: false });
+
+  el.addEventListener("touchend", async () => {
+    if (!drag || drag.el !== el) return;
+    drag.ghost.remove();
+    drag.el.style.opacity = "";
+    document.querySelectorAll(".cal-day-col").forEach(c => c.classList.remove("drag-target"));
+
+    if (drag.previewDay !== undefined) {
+      const target = new Date(currentWeekStart);
+      target.setDate(target.getDate() + drag.previewDay);
+      target.setHours(Math.floor(drag.previewMin / 60), drag.previewMin % 60, 0, 0);
+      const newISO = `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}:00`;
+
+      if (newISO !== drag.origScheduledAt) {
+        const savedEv = drag.ev;
+        savedEv.scheduled_at = newISO;
+        savedEv.is_computed = false;
+        renderWeek();
+        try {
+          const res = await fetch(`/api/tasks/${savedEv.task_id}/subtasks/${savedEv.subtask_id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scheduled_at: newISO })
+          });
+          if (!res.ok) throw new Error("patch failed");
+        } catch(e) {
+          savedEv.scheduled_at = drag.origScheduledAt;
+          savedEv.is_computed = drag.origScheduledAt === null;
+          renderWeek();
+        }
+      }
+    }
+    drag = null;
+  });
+}
+
+function escHtml(str) {
+  return String(str||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// Update now-line every minute
+setInterval(() => {
+  const line = document.getElementById("nowLine");
+  if (line) {
+    const now = new Date();
+    line.style.top = ((now.getHours() + now.getMinutes()/60) * HOUR_PX) + "px";
+  }
+}, 60000);
+
+loadWeek();
+</script>
+</body>
+</html>
