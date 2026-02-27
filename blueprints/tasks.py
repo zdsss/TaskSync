@@ -34,6 +34,12 @@ def api_tasks_list():
     return jsonify(ts.list_tasks())
 
 
+@bp.route("/api/tasks/slim", methods=["GET"])
+def api_tasks_slim():
+    """Returns tasks without subtasks — for pages that only need task metadata."""
+    return jsonify(ts.list_tasks(include_subtasks=False))
+
+
 @bp.route("/api/tasks", methods=["POST"])
 def api_tasks_create():
     data = request.get_json(force=True)

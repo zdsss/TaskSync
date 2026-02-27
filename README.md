@@ -206,3 +206,7 @@ python migrate.py
 - [x] **知识图谱 Canvas 可视化**：力导向图，节点拖拽、hover 提示、点击跳转，无外部依赖
 - [x] **架构重构**：app.py 拆分为 5 个蓝图，stores/ 共享数据层，ai/ 独立模块，消除跨模块循环依赖
 - [x] **多标签过滤性能**：改用纯 SQL GROUP BY + HAVING COUNT，消除 N+1 查询
+- [x] **洞察趋势图**：近 8 周子任务完成数柱状图，数据来自 `/api/stats`
+- [x] **日历任务过滤**：`/api/calendar/week?task_id=xxx`，从任务详情页跳转日历时自动聚焦
+- [x] **知识条目来源任务**：条目卡片底部显示关联任务标题（`source_task_id` 已有，现在展示）
+- [x] **洞察页性能**：改用 `/api/tasks/slim`（不含子任务），减少不必要数据传输

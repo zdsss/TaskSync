@@ -16,6 +16,7 @@ def calendar_page():
 @bp.route("/api/calendar/week", methods=["GET"])
 def api_calendar_week():
     start_str = request.args.get("start", "")
+    task_id_filter = request.args.get("task_id", "").strip() or None
     try:
         week_start = dt.strptime(start_str, "%Y-%m-%d").date()
     except ValueError:
@@ -23,8 +24,11 @@ def api_calendar_week():
         week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
 
+    tasks = [ts.get_task(task_id_filter)] if task_id_filter else ts.list_tasks()
+    tasks = [t for t in tasks if t]
+
     events = []
-    for task in ts.list_tasks():
+    for task in tasks:
         task_start = task.get("start_date")
         daily_slots = task.get("daily_slots") or ["09:00"]
         slot_times = [tuple(map(int, s.split(":"))) for s in daily_slots]

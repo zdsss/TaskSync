@@ -29,6 +29,14 @@
     .stat-card { background: #fff; border-radius: 12px; padding: 14px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .stat-value { font-size: 28px; font-weight: 700; color: #007aff; line-height: 1.1; }
     .stat-label { font-size: 11px; color: #6e6e73; margin-top: 4px; line-height: 1.3; }
+    /* Trend chart */
+    .trend-wrap { overflow-x: auto; }
+    .trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; padding: 0 2px; }
+    .trend-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 28px; }
+    .trend-bar { width: 100%; background: #007aff; border-radius: 4px 4px 0 0; min-height: 3px; transition: height 0.3s; }
+    .trend-bar.zero { background: #e5e5ea; }
+    .trend-label { font-size: 9px; color: #aeaeb2; white-space: nowrap; }
+    .trend-count { font-size: 10px; color: #6e6e73; font-weight: 600; }
     /* Tag cloud */
     .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
     .tag-pill { padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #e5e5ea; color: #3a3a3c; }
@@ -92,6 +100,7 @@
       .task-group-header { border-bottom-color: #2c2c2e; }
       .task-group-entries { border-top-color: #2c2c2e; }
       .ke-row { border-bottom-color: #2c2c2e; }
+      .trend-bar.zero { background: #2c2c2e; }
     }
   </style>
 </head>
@@ -104,6 +113,11 @@
   <div class="stat-card"><div class="stat-value" id="statTasks">—</div><div class="stat-label">本月完成任务</div></div>
   <div class="stat-card"><div class="stat-value" id="statRate">—</div><div class="stat-label">子任务完成率</div></div>
   <div class="stat-card"><div class="stat-value" id="statEntries">—</div><div class="stat-label">新增知识条目</div></div>
+</div>
+
+<div class="card">
+  <div class="section-header">近 8 周子任务完成趋势</div>
+  <div class="trend-wrap"><div class="trend-bars" id="trendBars"></div></div>
 </div>
 
 <div class="card">
@@ -128,12 +142,13 @@
   async function loadAll() {
     try {
       const [statsRes, tasksRes, entriesRes] = await Promise.all([
-        fetch("/api/stats"), fetch("/api/tasks"), fetch("/api/knowledge")
+        fetch("/api/stats"), fetch("/api/tasks/slim"), fetch("/api/knowledge")
       ]);
       const stats = await statsRes.json();
       const tasks = await tasksRes.json();
       const entries = await entriesRes.json();
       renderStats(stats);
+      renderTrend(stats.weekly_subtask_trend || []);
       renderTagCloud(entries);
       renderTaskGroups(tasks, entries);
     } catch(e) {
@@ -146,6 +161,22 @@
     document.getElementById("statTasks").textContent = stats.completed_tasks_this_month ?? "—";
     document.getElementById("statRate").textContent = stats.subtask_completion_rate != null ? stats.subtask_completion_rate + "%" : "—";
     document.getElementById("statEntries").textContent = stats.new_knowledge_entries_this_month ?? "—";
+  }
+
+  function renderTrend(trend) {
+    const container = document.getElementById("trendBars");
+    if (!trend.length) { container.innerHTML = '<div style="color:#aeaeb2;font-size:13px">暂无数据</div>'; return; }
+    const max = Math.max(...trend.map(w => w.done), 1);
+    container.innerHTML = trend.map(w => {
+      const pct = Math.round((w.done / max) * 72);
+      const d = new Date(w.week);
+      const label = `${d.getMonth()+1}/${d.getDate()}`;
+      return `<div class="trend-col">
+        <div class="trend-count">${w.done || ""}</div>
+        <div class="trend-bar ${w.done === 0 ? "zero" : ""}" style="height:${pct}px"></div>
+        <div class="trend-label">${label}</div>
+      </div>`;
+    }).join("");
   }
 
   function renderTagCloud(entries) {

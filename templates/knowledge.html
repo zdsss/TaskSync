@@ -638,9 +638,14 @@
   let formSourceSubtaskId = null;
   let bulkMode = false;
   let selectedIds = new Set();
+  let taskMap = {};  // id -> title, for source task display
 
   // ── Init ──────────────────────────────────────────────────────────────────
   renderTypeChips();
+  // Load tasks for source-task display (slim, no subtasks)
+  fetch("/api/tasks/slim").then(r => r.json()).then(tasks => {
+    tasks.forEach(t => { taskMap[t.id] = t.title; });
+  }).catch(() => {});
   loadEntries().then(() => {
     const hash = location.hash;
     const m = hash.match(/^#entry=(.+)$/);
@@ -715,6 +720,7 @@
           </div>
           ${e.summary ? `<div class="entry-summary">${highlightText(e.summary, q)}</div>` : ""}
           ${e.tags && e.tags.length ? `<div class="entry-tags">${e.tags.map(t=>`<span class="tag-pill">${escHtml(t)}</span>`).join("")}</div>` : ""}
+          ${e.source_task_id && taskMap[e.source_task_id] ? `<div style="font-size:11px;color:#aeaeb2;margin-top:5px">📎 ${escHtml(taskMap[e.source_task_id])}</div>` : ""}
           <div class="entry-date">${fmtDate(e.created_at)}</div>
         </div>
       `).join("");

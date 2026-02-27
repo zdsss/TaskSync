@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from stores.db import get_conn
 
@@ -51,7 +51,7 @@ def _row_to_task(row, subtask_rows) -> dict:
     return task
 
 
-def list_tasks() -> list:
+def list_tasks(include_subtasks: bool = True) -> list:
     conn = get_conn()
     try:
         tasks = conn.execute(
@@ -59,10 +59,13 @@ def list_tasks() -> list:
         ).fetchall()
         result = []
         for t in tasks:
-            subtasks = conn.execute(
-                "SELECT * FROM subtasks WHERE task_id=? ORDER BY sort_order",
-                (t["id"],)
-            ).fetchall()
+            if include_subtasks:
+                subtasks = conn.execute(
+                    "SELECT * FROM subtasks WHERE task_id=? ORDER BY sort_order",
+                    (t["id"],)
+                ).fetchall()
+            else:
+                subtasks = []
             result.append(_row_to_task(t, subtasks))
         return result
     finally:
@@ -287,12 +290,29 @@ def get_task_stats() -> dict:
         ).fetchone()[0]
         subtask_rate = round(done_subtasks / total_subtasks * 100) if total_subtasks > 0 else 0
 
+        # Weekly subtask completion trend: last 8 weeks (Mon–Sun buckets)
+        # Use completed_at to bucket; fall back to empty weeks
+        today = now.date()
+        # Start of current week (Monday)
+        week_monday = today - timedelta(days=today.weekday())
+        weekly_trend = []
+        for i in range(7, -1, -1):
+            w_start = week_monday - timedelta(weeks=i)
+            w_end = w_start + timedelta(days=7)
+            count = conn.execute(
+                "SELECT COUNT(*) FROM subtasks WHERE status='done'"
+                " AND completed_at >= ? AND completed_at < ?",
+                (w_start.isoformat(), w_end.isoformat())
+            ).fetchone()[0]
+            weekly_trend.append({"week": w_start.isoformat(), "done": count})
+
         return {
             "completed_tasks_this_month": completed_this_month,
             "subtask_completion_rate": subtask_rate,
             "total_tasks": total_tasks,
             "total_subtasks": total_subtasks,
             "done_subtasks": done_subtasks,
+            "weekly_subtask_trend": weekly_trend,
             "_month_start_iso": month_start_iso,
         }
     finally:
