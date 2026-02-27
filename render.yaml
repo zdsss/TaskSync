@@ -9,4 +9,10 @@ services:
         generateValue: true
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: DATA_DIR
+        value: /data
     plan: free
+    disk:
+      name: tasksync-data
+      mountPath: /data
+      sizeGB: 1

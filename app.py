@@ -18,6 +18,9 @@ from validation_ai import validate_entries
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
+ts.init_db()
+ks.init_db()
+
 # Suppress werkzeug request body logging
 log = logging.getLogger("werkzeug")
 log.setLevel(logging.ERROR)
@@ -454,6 +457,17 @@ def api_tasks_delete(task_id):
     if not ts.delete_task(task_id):
         return jsonify({"error": "not found"}), 404
     return jsonify({"ok": True})
+
+
+@app.route("/api/tasks/<task_id>/subtasks", methods=["POST"])
+def api_subtask_create(task_id):
+    data = request.get_json(force=True)
+    if not data.get("title", "").strip():
+        return jsonify({"error": "title is required"}), 400
+    st = ts.create_subtask(task_id, data)
+    if st is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(st), 201
 
 
 @app.route("/api/tasks/<task_id>/subtasks/<subtask_id>", methods=["PATCH"])

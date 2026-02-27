@@ -88,6 +88,38 @@
     .suggest-card { background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1.5px solid #d1d1d6; }
     .suggest-card.accepted { border-color: #34c759; }
     .suggest-actions { display: flex; gap: 8px; margin-top: 8px; }
+    @media (hover: hover) {
+      .btn-primary:hover   { background: #0066d6; }
+      .btn-secondary:hover { background: #d1d1d6; }
+      .nav-back:hover, .nav-btn-settings:hover { opacity: 0.65; }
+      .tab-item:hover:not(.active) { color: #3a3a3c; }
+    }
+    @media (hover: hover) and (prefers-color-scheme: dark) {
+      .btn-secondary:hover { background: #3a3a3c; }
+      .tab-item:hover:not(.active) { color: #ebebf5; }
+    }
+    @media (min-width: 768px) {
+      .tab-bar {
+        top: 0; bottom: 0; left: 0; right: auto;
+        width: 72px; height: 100vh;
+        flex-direction: column;
+        justify-content: flex-start;
+        padding-top: 80px; padding-bottom: 0;
+        border-top: none;
+        border-right: 0.5px solid rgba(60,60,67,0.2);
+      }
+      .tab-item { width: 72px; height: 64px; flex: 0 0 64px; padding-top: 0; }
+      .tab-icon { font-size: 20px; }
+      .nav-bar { left: 72px; }
+      body {
+        padding-left: calc(72px + 16px);
+        padding-bottom: 16px;
+      }
+      .btn { min-height: 38px; font-size: 15px; padding: 9px 16px; }
+    }
+    @media (min-width: 768px) and (prefers-color-scheme: dark) {
+      .tab-bar { border-right-color: rgba(255,255,255,0.12); }
+    }
     @media (prefers-color-scheme: dark) {
       body { background: #000; color: #fff; }
       .nav-bar, .tab-bar { background: rgba(28,28,30,0.92); border-color: rgba(255,255,255,0.15); }

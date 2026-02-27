@@ -2,7 +2,7 @@
 
 个人效率工具集，包含**任务管理**、**内置日历**、**知识库**（含知识图谱、技能树、知识校验）和**洞察**四大模块。
 
-基于 Flask + 纯 HTML/CSS/JS，无前端框架依赖，可本地运行或部署到 Render。
+基于 Flask + 纯 HTML/CSS/JS，无前端框架依赖，可本地运行或部署到 Render。数据存储于 SQLite，支持 Render 磁盘持久化。
 
 ---
 
@@ -27,6 +27,7 @@
 - 7 列时间网格（周一–周日），每小时 60px，支持独立滚动
 - 子任务按 `start_date + day_offset + slot_cycling` 自动定位，拖拽后写入 `scheduled_at` 持久化
 - 触摸拖拽改期，15 分钟对齐，松手即 PATCH API
+- **鼠标拖拽**：桌面端支持鼠标拖拽改期，悬停显示事件标题 tooltip
 - **拖拽创建**：在空白区域向下拖动，蓝色虚线预览块实时显示时间范围，松手弹出创建面板并预填时间和时长
 - 时长选择下拉（15/30/45/60/90/120 分钟），替代数字输入框
 - 点击事件块弹出底部详情面板，「查看任务」跳转详情页
@@ -62,8 +63,7 @@
 - 正文 Markdown 渲染（详情页）
 - AI 自动提取摘要、标签、建议类型（OpenAI 兼容 API）
 - JSON 导出 / 导入备份（支持 merge 模式，跳过重复条目），结果以页面内提示展示
-- 数据存储于本地 `data/knowledge.json`，原子写入防止文件损坏
-
+- 数据存储于 SQLite（`data/tasksync.db`），WAL 模式，支持并发读写
 ### 知识图谱（`/knowledge/graph`）
 
 AI 分析所有条目，自动聚类并发现条目间关联。
@@ -121,13 +121,14 @@ python app.py
 TaskSync/
 ├── app.py                  # Flask 路由
 ├── task_decomposer.py      # AI 任务拆解
-├── task_store.py           # 任务 JSON 存储层
+├── task_store.py           # 任务 SQLite 存储层
 ├── calendar_generator.py   # .ics 生成
-├── knowledge_store.py      # 知识库 JSON 存储层
+├── knowledge_store.py      # 知识库 SQLite 存储层
 ├── knowledge_ai.py         # AI：条目分析
 ├── knowledge_graph_ai.py   # AI：知识图谱生成
 ├── skill_tree_ai.py        # AI：技能树生成
 ├── validation_ai.py        # AI：知识校验
+├── migrate.py              # JSON → SQLite 一次性迁移脚本
 ├── static/
 │   └── api-config.js       # 统一 API 配置（localStorage 持久化）
 ├── templates/
@@ -140,11 +141,7 @@ TaskSync/
 │   ├── skill_tree.html     # 技能树页面
 │   └── validation.html     # 知识校验页面
 ├── data/                   # 运行时生成，已 gitignore
-│   ├── tasks.json
-│   ├── knowledge.json
-│   ├── knowledge_graph.json
-│   ├── skill_tree.json
-│   └── validation_results.json
+│   └── tasksync.db         # SQLite 数据库（任务、知识库、图谱等）
 ├── requirements.txt
 ├── Procfile
 └── render.yaml
@@ -160,7 +157,19 @@ TaskSync/
 
 > 免费套餐 15 分钟无请求后休眠，首次唤醒约 30 秒。
 >
-> 注意：所有数据存在本地文件，Render 免费套餐磁盘不持久化，重新部署后数据会丢失。生产使用建议接入外部数据库（见待办）。
+> `render.yaml` 已配置 1GB 持久化磁盘（挂载到 `/data`），SQLite 数据库在重新部署后不会丢失。
+
+---
+
+## 从旧版 JSON 迁移
+
+如果本地 `data/` 目录存有旧版 JSON 文件，运行一次迁移脚本即可导入到 SQLite：
+
+```bash
+python migrate.py
+```
+
+原 JSON 文件保留作备份，不会被删除。
 
 ---
 
@@ -180,7 +189,7 @@ TaskSync/
 ## 待办
 
 - [x] **内置日历**：周视图时间网格，触摸拖拽改期，拖拽创建任务，无需外部日历 App
-- [ ] **数据持久化**：Render 免费磁盘不持久，考虑接入 SQLite（挂载卷）或 PostgreSQL
+- [x] **数据持久化**：存储层迁移至 SQLite（WAL 模式），Render 配置 1GB 持久化磁盘，重新部署不丢数据
 - [x] **知识库导出**：支持导出为 JSON 备份文件，支持导入（merge 模式）
 - [x] **标签云**：在知识库列表页展示高频标签，点击快速过滤
 - [x] **条目排序**：支持按更新时间 / 创建时间切换排序
@@ -192,5 +201,6 @@ TaskSync/
 - [x] **洞察看板**：月度统计、标签云、任务-知识关联视图
 - [x] **部署验证**：推送到 GitHub 并完成 Render 首次部署
 - [x] **移动端优化**：知识库详情页长文本的滚动体验
+- [x] **桌面端适配**：≥768px 侧边栏导航、知识库详情侧边面板、悬停交互效果
 - [x] **知识库搜索增强**：支持多标签组合过滤
 - [x] **批量操作**：批量删除 / 导出选中条目

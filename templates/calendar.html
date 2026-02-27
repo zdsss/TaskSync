@@ -238,6 +238,52 @@
     /* Tiny event blocks */
     .cal-event.tiny { padding: 0; border-left: 3px solid rgba(255,255,255,0.5); }
 
+    @media (hover: hover) {
+      .cal-event:hover { filter: brightness(1.12); cursor: grab; }
+      .cal-event.dragging { cursor: grabbing; }
+      .cal-event { overflow: visible; }
+      .cal-event > div { overflow: hidden; }
+      .cal-event:hover::after {
+        content: attr(title);
+        position: absolute;
+        bottom: calc(100% + 4px); left: 0;
+        background: rgba(0,0,0,0.82); color: #fff;
+        font-size: 12px; font-weight: 500;
+        padding: 4px 8px; border-radius: 6px;
+        white-space: nowrap; pointer-events: none; z-index: 200;
+        max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+      }
+      .btn-primary:hover { background: #0066d6; }
+      .btn-secondary:hover { background: #d1d1d6; }
+      .nav-prev:hover, .nav-next:hover, .nav-today:hover, .nav-filter:hover { opacity: 0.65; }
+      .tab-item:hover:not(.active) { color: #3a3a3c; }
+    }
+    @media (hover: hover) and (prefers-color-scheme: dark) {
+      .btn-secondary:hover { background: #3a3a3c; }
+      .tab-item:hover:not(.active) { color: #ebebf5; }
+    }
+    @media (min-width: 768px) {
+      .tab-bar {
+        top: 0; bottom: 0; left: 0; right: auto;
+        width: 72px; height: 100vh;
+        flex-direction: column;
+        justify-content: flex-start;
+        padding-top: 80px; padding-bottom: 0;
+        border-top: none;
+        border-right: 0.5px solid rgba(60,60,67,0.2);
+      }
+      .tab-item { width: 72px; height: 64px; flex: 0 0 64px; padding-top: 0; }
+      .tab-icon { font-size: 20px; }
+      .nav-bar { left: 72px; }
+      .cal-header, .cal-scroll { left: 72px; }
+      .cal-scroll { bottom: 0; }
+      .form-row input:not([type="checkbox"]):not([type="radio"]),
+      .form-row select { height: 36px; font-size: 15px; padding: 0 10px; }
+      .btn { min-height: 38px; font-size: 15px; padding: 9px 16px; }
+    }
+    @media (min-width: 768px) and (prefers-color-scheme: dark) {
+      .tab-bar { border-right-color: rgba(255,255,255,0.12); }
+    }
     /* Dark mode */
     @media (prefers-color-scheme: dark) {
       body { background: #000; color: #fff; }
@@ -536,6 +582,7 @@ function renderGrid() {
         el.innerHTML = `<div style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escHtml(ev.title)}</div><div style="font-size:10px;opacity:0.85;font-weight:400">${evTime}</div>`;
       }
 
+      el.title = ev.title;
       el.addEventListener("click", e => { e.stopPropagation(); openDetail(ev); });
       initDrag(el, ev);
       col.appendChild(el);
@@ -787,6 +834,73 @@ function initDrag(el, ev) {
       }
     }
     drag = null;
+  });
+
+  el.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const ghost = el.cloneNode(true);
+    ghost.classList.add("dragging");
+    ghost.style.cssText += `;position:fixed;width:${el.getBoundingClientRect().width}px;pointer-events:none;z-index:999;`;
+    document.body.appendChild(ghost);
+    el.style.opacity = "0.25";
+    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined };
+
+    function onMouseMove(e) {
+      if (!drag || drag.el !== el) return;
+      drag.ghost.style.left = (e.clientX - drag.ghost.offsetWidth / 2) + "px";
+      drag.ghost.style.top  = (e.clientY - 20) + "px";
+      const grid = document.getElementById("calGrid");
+      const rect = grid.getBoundingClientRect();
+      const scrollTop = document.getElementById("calScroll").scrollTop;
+      const colW = (rect.width - 48) / 7;
+      const relX = e.clientX - rect.left - 48;
+      const dayIdx = Math.max(0, Math.min(6, Math.floor(relX / colW)));
+      const relY = e.clientY - rect.top + scrollTop;
+      const snapped = Math.max(0, Math.min(23*60+45, Math.round((relY/HOUR_PX*60) / SNAP_MIN) * SNAP_MIN));
+      drag.previewDay = dayIdx;
+      drag.previewMin = snapped;
+      document.querySelectorAll(".cal-day-col[data-day]").forEach((c, i) => {
+        c.classList.toggle("drag-target", i === dayIdx);
+      });
+    }
+
+    async function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      if (!drag || drag.el !== el) return;
+      drag.ghost.remove();
+      drag.el.style.opacity = "";
+      document.querySelectorAll(".cal-day-col").forEach(c => c.classList.remove("drag-target"));
+      if (drag.previewDay !== undefined) {
+        const target = new Date(currentWeekStart);
+        target.setDate(target.getDate() + drag.previewDay);
+        target.setHours(Math.floor(drag.previewMin/60), drag.previewMin%60, 0, 0);
+        const newISO = `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}:00`;
+        if (newISO !== drag.origScheduledAt) {
+          const savedEv = drag.ev;
+          savedEv.scheduled_at = newISO; savedEv.is_computed = false;
+          renderWeek();
+          try {
+            const res = await fetch(`/api/tasks/${savedEv.task_id}/subtasks/${savedEv.subtask_id}`, {
+              method: "PATCH", headers: {"Content-Type":"application/json"},
+              body: JSON.stringify({ scheduled_at: newISO })
+            });
+            if (!res.ok) throw new Error();
+          } catch(e) {
+            savedEv.scheduled_at = drag.origScheduledAt;
+            savedEv.is_computed = drag.origScheduledAt === null;
+            renderWeek();
+          }
+        }
+      }
+      drag = null;
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   });
 }
 

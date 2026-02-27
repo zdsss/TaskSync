@@ -1,66 +1,134 @@
 import json
 import os
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
-KNOWLEDGE_FILE = DATA_DIR / "knowledge.json"
+DB_PATH = DATA_DIR / "tasksync.db"
 
 
-def _load() -> dict:
-    if not KNOWLEDGE_FILE.exists():
-        return {"version": 1, "entries": []}
-    with open(KNOWLEDGE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save(data: dict):
+def _get_conn() -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = KNOWLEDGE_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    tmp.replace(KNOWLEDGE_FILE)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+
+def init_db():
+    conn = _get_conn()
+    with conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS knowledge_entries (
+                id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT DEFAULT '',
+                summary TEXT DEFAULT '',
+                source_url TEXT DEFAULT '',
+                source_task_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS entry_tags (
+                entry_id TEXT NOT NULL REFERENCES knowledge_entries(id) ON DELETE CASCADE,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (entry_id, tag)
+            );
+
+            CREATE TABLE IF NOT EXISTS blobs (
+                key TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_ke_type ON knowledge_entries(type, created_at);
+            CREATE INDEX IF NOT EXISTS idx_ke_source_task ON knowledge_entries(source_task_id);
+            CREATE INDEX IF NOT EXISTS idx_entry_tags_tag ON entry_tags(tag);
+        """)
+    conn.close()
+
+
+def _get_tags(conn, entry_id: str) -> list:
+    rows = conn.execute(
+        "SELECT tag FROM entry_tags WHERE entry_id=? ORDER BY tag",
+        (entry_id,)
+    ).fetchall()
+    return [r["tag"] for r in rows]
+
+
+def _row_to_entry(row, tags) -> dict:
+    entry = dict(row)
+    entry["tags"] = tags
+    return entry
 
 
 def list_entries(type_filter=None, tags=None, q=None, source_task_id=None) -> list:
-    data = _load()
-    entries = data["entries"]
+    conn = _get_conn()
+    try:
+        where = []
+        params = []
 
-    if type_filter:
-        entries = [e for e in entries if e.get("type") == type_filter]
+        if type_filter:
+            where.append("ke.type=?")
+            params.append(type_filter)
 
-    if tags:
-        tag_set = set(t.lower() for t in tags)
-        entries = [e for e in entries if tag_set.intersection(t.lower() for t in e.get("tags", []))]
+        if source_task_id:
+            where.append("ke.source_task_id=?")
+            params.append(source_task_id)
 
-    if q:
-        q_lower = q.lower()
-        entries = [
-            e for e in entries
-            if q_lower in e.get("title", "").lower()
-            or q_lower in e.get("content", "").lower()
-            or q_lower in e.get("summary", "").lower()
-            or any(q_lower in t.lower() for t in e.get("tags", []))
-        ]
+        if q:
+            where.append("(ke.title LIKE ? OR ke.content LIKE ? OR ke.summary LIKE ?)")
+            like = f"%{q}%"
+            params.extend([like, like, like])
 
-    if source_task_id:
-        entries = [e for e in entries if e.get("source_task_id") == source_task_id]
+        if tags:
+            placeholders = ",".join("?" * len(tags))
+            where.append(
+                f"EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id=ke.id AND et.tag IN ({placeholders}))"
+            )
+            params.extend(tags)
 
-    return sorted(entries, key=lambda e: e.get("created_at", ""), reverse=True)
+        sql = "SELECT ke.* FROM knowledge_entries ke"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY ke.created_at DESC"
+
+        rows = conn.execute(sql, params).fetchall()
+
+        if tags and len(tags) > 1:
+            tag_set = set(t.lower() for t in tags)
+            result = []
+            for row in rows:
+                entry_tags = set(t.lower() for t in _get_tags(conn, row["id"]))
+                if tag_set.issubset(entry_tags):
+                    result.append(_row_to_entry(row, _get_tags(conn, row["id"])))
+            return result
+
+        return [_row_to_entry(row, _get_tags(conn, row["id"])) for row in rows]
+    finally:
+        conn.close()
 
 
 def get_entry(entry_id: str) -> dict | None:
-    data = _load()
-    for e in data["entries"]:
-        if e["id"] == entry_id:
-            return e
-    return None
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM knowledge_entries WHERE id=?", (entry_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_entry(row, _get_tags(conn, entry_id))
+    finally:
+        conn.close()
 
 
 def create_entry(entry: dict) -> dict:
-    data = _load()
     entry_id = f"ke_{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat()
     entry["id"] = entry_id
@@ -69,132 +137,253 @@ def create_entry(entry: dict) -> dict:
     entry.setdefault("tags", [])
     entry.setdefault("summary", "")
     entry.setdefault("source_url", "")
-    data["entries"].append(entry)
-    _save(data)
+
+    conn = _get_conn()
+    try:
+        with conn:
+            conn.execute(
+                """INSERT INTO knowledge_entries
+                   (id, type, title, content, summary, source_url, source_task_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    entry["id"],
+                    entry.get("type", ""),
+                    entry.get("title", ""),
+                    entry.get("content", ""),
+                    entry.get("summary", ""),
+                    entry.get("source_url", ""),
+                    entry.get("source_task_id"),
+                    entry["created_at"],
+                    entry["updated_at"],
+                )
+            )
+            for tag in entry.get("tags", []):
+                conn.execute(
+                    "INSERT OR IGNORE INTO entry_tags (entry_id, tag) VALUES (?, ?)",
+                    (entry_id, tag)
+                )
+    finally:
+        conn.close()
+
     return entry
 
 
 def update_entry(entry_id: str, updates: dict) -> dict | None:
-    data = _load()
-    for e in data["entries"]:
-        if e["id"] == entry_id:
-            updates.pop("id", None)
-            updates.pop("created_at", None)
-            e.update(updates)
-            e["updated_at"] = datetime.now(timezone.utc).isoformat()
-            _save(data)
-            return e
-    return None
+    updates.pop("id", None)
+    updates.pop("created_at", None)
+
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM knowledge_entries WHERE id=?", (entry_id,)
+        ).fetchone()
+        if row is None:
+            return None
+
+        allowed = {"type", "title", "content", "summary", "source_url", "source_task_id"}
+        set_parts = ["updated_at=?"]
+        values = [datetime.now(timezone.utc).isoformat()]
+
+        for k, v in updates.items():
+            if k in allowed:
+                set_parts.append(f"{k}=?")
+                values.append(v)
+
+        values.append(entry_id)
+        with conn:
+            conn.execute(
+                f"UPDATE knowledge_entries SET {', '.join(set_parts)} WHERE id=?",
+                values
+            )
+            if "tags" in updates:
+                conn.execute("DELETE FROM entry_tags WHERE entry_id=?", (entry_id,))
+                for tag in updates["tags"]:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO entry_tags (entry_id, tag) VALUES (?, ?)",
+                        (entry_id, tag)
+                    )
+
+        updated = conn.execute(
+            "SELECT * FROM knowledge_entries WHERE id=?", (entry_id,)
+        ).fetchone()
+        return _row_to_entry(updated, _get_tags(conn, entry_id))
+    finally:
+        conn.close()
 
 
 def delete_entry(entry_id: str) -> bool:
-    data = _load()
-    before = len(data["entries"])
-    data["entries"] = [e for e in data["entries"] if e["id"] != entry_id]
-    if len(data["entries"]) < before:
-        _save(data)
-        return True
-    return False
+    conn = _get_conn()
+    try:
+        with conn:
+            cur = conn.execute(
+                "DELETE FROM knowledge_entries WHERE id=?", (entry_id,)
+            )
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def bulk_delete(ids: list) -> int:
-    data = _load()
-    id_set = set(ids)
-    before = len(data["entries"])
-    data["entries"] = [e for e in data["entries"] if e["id"] not in id_set]
-    deleted = before - len(data["entries"])
-    if deleted:
-        _save(data)
-    return deleted
+    if not ids:
+        return 0
+    conn = _get_conn()
+    try:
+        placeholders = ",".join("?" * len(ids))
+        with conn:
+            cur = conn.execute(
+                f"DELETE FROM knowledge_entries WHERE id IN ({placeholders})", ids
+            )
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
+def _insert_entry(conn, entry: dict):
+    now = datetime.now(timezone.utc).isoformat()
+    entry_id = entry.get("id") or f"ke_{uuid.uuid4().hex[:12]}"
+    conn.execute(
+        """INSERT OR REPLACE INTO knowledge_entries
+           (id, type, title, content, summary, source_url, source_task_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            entry_id,
+            entry.get("type", ""),
+            entry.get("title", ""),
+            entry.get("content", ""),
+            entry.get("summary", ""),
+            entry.get("source_url", ""),
+            entry.get("source_task_id"),
+            entry.get("created_at", now),
+            entry.get("updated_at", now),
+        )
+    )
+    conn.execute("DELETE FROM entry_tags WHERE entry_id=?", (entry_id,))
+    for tag in entry.get("tags", []):
+        conn.execute(
+            "INSERT OR IGNORE INTO entry_tags (entry_id, tag) VALUES (?, ?)",
+            (entry_id, tag)
+        )
 
 
 def import_entries(entries: list, mode: str = "merge") -> dict:
-    data = _load()
-    existing_ids = {e["id"] for e in data["entries"]}
-    added = 0
-    skipped = 0
-    for entry in entries:
-        eid = entry.get("id")
-        if mode == "replace" and eid and eid in existing_ids:
-            data["entries"] = [entry if e["id"] == eid else e for e in data["entries"]]
-            added += 1
-        elif eid and eid in existing_ids:
-            skipped += 1
-        else:
-            data["entries"].append(entry)
-            existing_ids.add(eid)
-            added += 1
-    _save(data)
-    return {"added": added, "skipped": skipped}
+    conn = _get_conn()
+    try:
+        existing_ids = {
+            r["id"] for r in conn.execute("SELECT id FROM knowledge_entries").fetchall()
+        }
+        added = 0
+        skipped = 0
+        for entry in entries:
+            eid = entry.get("id")
+            if mode == "replace" and eid and eid in existing_ids:
+                with conn:
+                    _insert_entry(conn, entry)
+                added += 1
+            elif eid and eid in existing_ids:
+                skipped += 1
+            else:
+                with conn:
+                    _insert_entry(conn, entry)
+                if eid:
+                    existing_ids.add(eid)
+                added += 1
+        return {"added": added, "skipped": skipped}
+    finally:
+        conn.close()
 
 
 def get_all_tags() -> list:
-    data = _load()
-    freq: dict[str, int] = {}
-    for e in data["entries"]:
-        for t in e.get("tags", []):
-            freq[t] = freq.get(t, 0) + 1
-    return sorted([{"tag": t, "count": c} for t, c in freq.items()], key=lambda x: -x["count"])
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT tag, COUNT(*) as count FROM entry_tags GROUP BY tag ORDER BY count DESC"
+        ).fetchall()
+        return [{"tag": r["tag"], "count": r["count"]} for r in rows]
+    finally:
+        conn.close()
+
+
+def _load() -> dict:
+    """Compatibility shim used by app.py bulk export routes."""
+    return {"version": 1, "entries": list_entries()}
 
 
 # ── Knowledge Graph ────────────────────────────────────────────────────────────
 
-GRAPH_FILE = DATA_DIR / "knowledge_graph.json"
-
-
 def load_graph() -> dict:
-    if not GRAPH_FILE.exists():
-        return {"version": 1, "clusters": [], "relationships": []}
-    with open(GRAPH_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    conn = _get_conn()
+    try:
+        row = conn.execute("SELECT data FROM blobs WHERE key='graph'").fetchone()
+        if row is None:
+            return {"version": 1, "clusters": [], "relationships": []}
+        return json.loads(row["data"])
+    finally:
+        conn.close()
 
 
 def save_graph(data: dict):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = GRAPH_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    tmp.replace(GRAPH_FILE)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = _get_conn()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO blobs (key, data, updated_at) VALUES ('graph', ?, ?)",
+                (json.dumps(data, ensure_ascii=False), now)
+            )
+    finally:
+        conn.close()
 
 
 # ── Skill Tree ─────────────────────────────────────────────────────────────────
 
-SKILL_TREE_FILE = DATA_DIR / "skill_tree.json"
-
-
 def load_skill_tree() -> dict:
-    if not SKILL_TREE_FILE.exists():
-        return {"version": 1, "skills": []}
-    with open(SKILL_TREE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    conn = _get_conn()
+    try:
+        row = conn.execute("SELECT data FROM blobs WHERE key='skill_tree'").fetchone()
+        if row is None:
+            return {"version": 1, "skills": []}
+        return json.loads(row["data"])
+    finally:
+        conn.close()
 
 
 def save_skill_tree(data: dict):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = SKILL_TREE_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    tmp.replace(SKILL_TREE_FILE)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = _get_conn()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO blobs (key, data, updated_at) VALUES ('skill_tree', ?, ?)",
+                (json.dumps(data, ensure_ascii=False), now)
+            )
+    finally:
+        conn.close()
 
 
 # ── Validation ─────────────────────────────────────────────────────────────────
 
-VALIDATION_FILE = DATA_DIR / "validation_results.json"
-
-
 def load_validation() -> dict:
-    if not VALIDATION_FILE.exists():
-        return {"version": 1, "results": []}
-    with open(VALIDATION_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    conn = _get_conn()
+    try:
+        row = conn.execute("SELECT data FROM blobs WHERE key='validation'").fetchone()
+        if row is None:
+            return {"version": 1, "results": []}
+        return json.loads(row["data"])
+    finally:
+        conn.close()
 
 
 def save_validation(data: dict):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = VALIDATION_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    tmp.replace(VALIDATION_FILE)
+    now = datetime.now(timezone.utc).isoformat()
+    conn = _get_conn()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO blobs (key, data, updated_at) VALUES ('validation', ?, ?)",
+                (json.dumps(data, ensure_ascii=False), now)
+            )
+    finally:
+        conn.close()
 
 
 def apply_correction(entry_id: str, new_content: str) -> dict | None:
