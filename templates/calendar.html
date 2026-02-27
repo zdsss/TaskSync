@@ -93,7 +93,7 @@
     .cal-grid {
       display: grid;
       grid-template-columns: 48px repeat(7, 1fr);
-      height: 1440px;
+      height: 1920px;
       position: relative;
     }
 
@@ -405,7 +405,7 @@
 </nav>
 
 <script>
-const HOUR_PX = 60;
+const HOUR_PX = 80;
 const SNAP_MIN = 15;
 const DAY_NAMES = ["周一","周二","周三","周四","周五","周六","周日"];
 const TASK_COLORS = ["#007aff","#34c759","#ff9500","#ff3b30","#af52de","#5ac8fa","#ffcc00","#ff2d55"];
@@ -538,7 +538,7 @@ function renderGrid() {
       if (h < 23) {
         const half = document.createElement("div");
         half.className = "cal-hour-line half";
-        half.style.top = (h * HOUR_PX + 30) + "px";
+        half.style.top = (h * HOUR_PX + HOUR_PX / 2) + "px";
         col.appendChild(half);
       }
     }
@@ -941,12 +941,11 @@ function updatePreviewBlock(el, startMin, endMin) {
 
 function attachCreateDrag(col, dayIdx) {
   function startCreate(clientY) {
-    const scrollTop = document.getElementById("calScroll").scrollTop;
     const rect = col.getBoundingClientRect();
-    const relY = clientY - rect.top + scrollTop;
+    const relY = clientY - rect.top;
     const rawMin = (relY / HOUR_PX) * 60;
     const startMin = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
-    createDrag = { col, dayIdx, startMin, endMin: startMin + 30, startY: clientY, active: false, previewEl: null };
+    createDrag = { col, dayIdx, startMin, endMin: startMin + 60, startY: clientY, active: false, previewEl: null };
   }
 
   function moveCreate(clientY) {
@@ -954,12 +953,11 @@ function attachCreateDrag(col, dayIdx) {
     const dy = clientY - createDrag.startY;
     if (!createDrag.active && dy > 10) {
       createDrag.active = true;
-      createDrag.previewEl = createPreviewBlock(col, createDrag.startMin, createDrag.startMin + 30);
+      createDrag.previewEl = createPreviewBlock(col, createDrag.startMin, createDrag.startMin + 60);
     }
     if (createDrag.active) {
-      const scrollTop = document.getElementById("calScroll").scrollTop;
       const rect = col.getBoundingClientRect();
-      const relY = clientY - rect.top + scrollTop;
+      const relY = clientY - rect.top;
       const rawMin = (relY / HOUR_PX) * 60;
       const endMin = Math.max(createDrag.startMin + 15, Math.min(24 * 60, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
       createDrag.endMin = endMin;
@@ -980,7 +978,7 @@ function attachCreateDrag(col, dayIdx) {
       const d = new Date(currentWeekStart);
       d.setDate(d.getDate() + dayIdx);
       d.setHours(Math.floor(createDrag.startMin / 60), createDrag.startMin % 60, 0, 0);
-      openCreateSheet(d, 30);
+      openCreateSheet(d, 60);
     }
     createDrag = null;
   }
