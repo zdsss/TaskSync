@@ -769,12 +769,14 @@ async function saveDetailEdit() {
 function initDrag(el, ev) {
   el.addEventListener("touchstart", e => {
     e.preventDefault();
+    const elRect = el.getBoundingClientRect();
+    const grabOffsetY = e.touches[0].clientY - elRect.top;
     const ghost = el.cloneNode(true);
     ghost.classList.add("dragging");
-    ghost.style.cssText += `;position:fixed;width:${el.getBoundingClientRect().width}px;pointer-events:none;z-index:999;`;
+    ghost.style.cssText += `;position:fixed;width:${elRect.width}px;pointer-events:none;z-index:999;`;
     document.body.appendChild(ghost);
     el.style.opacity = "0.25";
-    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined };
+    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined, grabOffsetY };
   }, { passive: false });
 
   el.addEventListener("touchmove", e => {
@@ -782,7 +784,7 @@ function initDrag(el, ev) {
     e.preventDefault();
     const t = e.touches[0];
     drag.ghost.style.left = (t.clientX - drag.ghost.offsetWidth / 2) + "px";
-    drag.ghost.style.top = (t.clientY - 20) + "px";
+    drag.ghost.style.top = (t.clientY - drag.grabOffsetY) + "px";
 
     const grid = document.getElementById("calGrid");
     const rect = grid.getBoundingClientRect();
@@ -790,7 +792,7 @@ function initDrag(el, ev) {
     const colW = (rect.width - 48) / 7;
     const relX = t.clientX - rect.left - 48;
     const dayIdx = Math.max(0, Math.min(6, Math.floor(relX / colW)));
-    const relY = t.clientY - rect.top + scrollTop;
+    const relY = t.clientY - rect.top + scrollTop - drag.grabOffsetY;
     const rawMin = (relY / HOUR_PX) * 60;
     const snapped = Math.max(0, Math.min(23 * 60 + 45, Math.round(rawMin / SNAP_MIN) * SNAP_MIN));
 
@@ -841,24 +843,26 @@ function initDrag(el, ev) {
     e.preventDefault();
     e.stopPropagation();
 
+    const elRect = el.getBoundingClientRect();
+    const grabOffsetY = e.clientY - elRect.top;
     const ghost = el.cloneNode(true);
     ghost.classList.add("dragging");
-    ghost.style.cssText += `;position:fixed;width:${el.getBoundingClientRect().width}px;pointer-events:none;z-index:999;`;
+    ghost.style.cssText += `;position:fixed;width:${elRect.width}px;pointer-events:none;z-index:999;`;
     document.body.appendChild(ghost);
     el.style.opacity = "0.25";
-    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined };
+    drag = { el, ev, ghost, origScheduledAt: ev.scheduled_at, previewDay: undefined, previewMin: undefined, grabOffsetY };
 
     function onMouseMove(e) {
       if (!drag || drag.el !== el) return;
       drag.ghost.style.left = (e.clientX - drag.ghost.offsetWidth / 2) + "px";
-      drag.ghost.style.top  = (e.clientY - 20) + "px";
+      drag.ghost.style.top  = (e.clientY - drag.grabOffsetY) + "px";
       const grid = document.getElementById("calGrid");
       const rect = grid.getBoundingClientRect();
       const scrollTop = document.getElementById("calScroll").scrollTop;
       const colW = (rect.width - 48) / 7;
       const relX = e.clientX - rect.left - 48;
       const dayIdx = Math.max(0, Math.min(6, Math.floor(relX / colW)));
-      const relY = e.clientY - rect.top + scrollTop;
+      const relY = e.clientY - rect.top + scrollTop - drag.grabOffsetY;
       const snapped = Math.max(0, Math.min(23*60+45, Math.round((relY/HOUR_PX*60) / SNAP_MIN) * SNAP_MIN));
       drag.previewDay = dayIdx;
       drag.previewMin = snapped;
@@ -972,6 +976,11 @@ function attachCreateDrag(col, dayIdx) {
       d.setHours(Math.floor(createDrag.startMin / 60), createDrag.startMin % 60, 0, 0);
       const duration = snapToSelectOption(createDrag.endMin - createDrag.startMin);
       openCreateSheet(d, duration);
+    } else if (!createDrag.active) {
+      const d = new Date(currentWeekStart);
+      d.setDate(d.getDate() + dayIdx);
+      d.setHours(Math.floor(createDrag.startMin / 60), createDrag.startMin % 60, 0, 0);
+      openCreateSheet(d, 30);
     }
     createDrag = null;
   }
