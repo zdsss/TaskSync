@@ -210,3 +210,10 @@ python migrate.py
 - [x] **日历任务过滤**：`/api/calendar/week?task_id=xxx`，从任务详情页跳转日历时自动聚焦
 - [x] **知识条目来源任务**：条目卡片底部显示关联任务标题（`source_task_id` 已有，现在展示）
 - [x] **洞察页性能**：改用 `/api/tasks/slim`（不含子任务），减少不必要数据传输
+- [x] **任务列表性能**：首页改用 `/api/tasks/slim`；slim 接口子任务计数改为单条 GROUP BY 聚合查询，消除 N+1
+- [x] **知识条目标签 N+1 修复**：`list_entries()` 改为单条 `WHERE entry_id IN (...)` 批量拉取标签，不再逐行查询
+- [x] **洞察趋势查询优化**：8 周趋势从 8 次独立查询改为单次范围查询 + Python 分桶
+- [x] **新增 `idx_subtasks_status` 索引**：`get_task_stats()` 高频 `WHERE status='done'` 查询不再全表扫描
+- [x] **标签过滤 XSS 修复**：`renderActiveTagChips` 改用 `data-tag` + `addEventListener`，消除单引号注入风险
+- [x] **任务详情知识条目可点击**：条目卡片改为 `<a>` 标签，点击直接跳转知识库对应条目
+- [x] **移除死代码**：`task_detail.html` 中调用不存在 DOM 元素的 `fillApiConfigInputs` 已删除（有 API 配置时会抛 TypeError）

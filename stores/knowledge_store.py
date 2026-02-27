@@ -100,7 +100,18 @@ def list_entries(type_filter=None, tags=None, q=None, source_task_id=None) -> li
         sql += " ORDER BY ke.created_at DESC"
 
         rows = conn.execute(sql, params).fetchall()
-        return [_row_to_entry(row, _get_tags(conn, row["id"])) for row in rows]
+        if not rows:
+            return []
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" * len(ids))
+        tag_rows = conn.execute(
+            f"SELECT entry_id, tag FROM entry_tags WHERE entry_id IN ({placeholders}) ORDER BY tag",
+            ids
+        ).fetchall()
+        tags_by_id: dict = {}
+        for tr in tag_rows:
+            tags_by_id.setdefault(tr["entry_id"], []).append(tr["tag"])
+        return [_row_to_entry(row, tags_by_id.get(row["id"], [])) for row in rows]
     finally:
         conn.close()
 

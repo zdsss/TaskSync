@@ -35,6 +35,7 @@ def init_db():
             );
 
             CREATE INDEX IF NOT EXISTS idx_subtasks_task_id ON subtasks(task_id);
+            CREATE INDEX IF NOT EXISTS idx_subtasks_status ON subtasks(status);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status, created_at);
         """)
     conn.close()
@@ -57,16 +58,35 @@ def list_tasks(include_subtasks: bool = True) -> list:
         tasks = conn.execute(
             "SELECT * FROM tasks ORDER BY created_at DESC"
         ).fetchall()
-        result = []
-        for t in tasks:
-            if include_subtasks:
+        if not tasks:
+            return []
+        if include_subtasks:
+            result = []
+            for t in tasks:
                 subtasks = conn.execute(
                     "SELECT * FROM subtasks WHERE task_id=? ORDER BY sort_order",
                     (t["id"],)
                 ).fetchall()
-            else:
-                subtasks = []
-            result.append(_row_to_task(t, subtasks))
+                result.append(_row_to_task(t, subtasks))
+            return result
+        # Slim path: fetch all subtask counts in one query
+        ids = [t["id"] for t in tasks]
+        placeholders = ",".join("?" * len(ids))
+        count_rows = conn.execute(
+            f"SELECT task_id,"
+            f" COUNT(*) as total,"
+            f" SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as done"
+            f" FROM subtasks WHERE task_id IN ({placeholders}) GROUP BY task_id",
+            ids
+        ).fetchall()
+        counts = {r["task_id"]: r for r in count_rows}
+        result = []
+        for t in tasks:
+            task_dict = _row_to_task(t, [])
+            c = counts.get(t["id"])
+            task_dict["subtask_total"] = c["total"] if c else 0
+            task_dict["subtask_done"] = c["done"] if c else 0
+            result.append(task_dict)
         return result
     finally:
         conn.close()
@@ -291,20 +311,32 @@ def get_task_stats() -> dict:
         subtask_rate = round(done_subtasks / total_subtasks * 100) if total_subtasks > 0 else 0
 
         # Weekly subtask completion trend: last 8 weeks (Mon–Sun buckets)
-        # Use completed_at to bucket; fall back to empty weeks
         today = now.date()
-        # Start of current week (Monday)
         week_monday = today - timedelta(days=today.weekday())
-        weekly_trend = []
+        range_start = week_monday - timedelta(weeks=7)
+        range_end = week_monday + timedelta(days=7)
+
+        # Single query for all 8 weeks; bucket in Python
+        done_rows = conn.execute(
+            "SELECT completed_at FROM subtasks WHERE status='done'"
+            " AND completed_at >= ? AND completed_at < ?",
+            (range_start.isoformat(), range_end.isoformat())
+        ).fetchall()
+
+        # Build week buckets
+        week_counts: dict = {}
         for i in range(7, -1, -1):
-            w_start = week_monday - timedelta(weeks=i)
-            w_end = w_start + timedelta(days=7)
-            count = conn.execute(
-                "SELECT COUNT(*) FROM subtasks WHERE status='done'"
-                " AND completed_at >= ? AND completed_at < ?",
-                (w_start.isoformat(), w_end.isoformat())
-            ).fetchone()[0]
-            weekly_trend.append({"week": w_start.isoformat(), "done": count})
+            w = (week_monday - timedelta(weeks=i)).isoformat()
+            week_counts[w] = 0
+        for row in done_rows:
+            try:
+                d = datetime.fromisoformat(row["completed_at"]).date()
+                w = (d - timedelta(days=d.weekday())).isoformat()
+                if w in week_counts:
+                    week_counts[w] += 1
+            except (ValueError, TypeError):
+                pass
+        weekly_trend = [{"week": w, "done": c} for w, c in week_counts.items()]
 
         return {
             "completed_tasks_this_month": completed_this_month,

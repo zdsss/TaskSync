@@ -1003,9 +1003,12 @@
     el.innerHTML = [...activeTagFilters].map(t =>
       `<span class="chip active" style="display:inline-flex;align-items:center;gap:4px;">
         ${escHtml(t)}
-        <button onclick="toggleTagFilter('${escHtml(t)}')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
+        <button data-tag="${escHtml(t)}" class="active-tag-remove" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:0;line-height:1">×</button>
       </span>`
     ).join("");
+    el.querySelectorAll(".active-tag-remove").forEach(btn => {
+      btn.addEventListener("click", () => toggleTagFilter(btn.dataset.tag));
+    });
   }
 
   function toggleSort() {
