@@ -1,6 +1,6 @@
 # TaskSync
 
-个人效率工具集，包含**任务管理**、**内置日历**、**知识库**（含知识图谱、技能树、知识校验）和**洞察**四大模块。
+个人效率工具集，包含**任务管理**、**内置日历**、**知识库**（含知识图谱、技能树）和**洞察**四大模块。
 
 基于 Flask + 纯 HTML/CSS/JS，无前端框架依赖，可本地运行或部署到 Render。数据存储于 SQLite，支持 Render 磁盘持久化。
 
@@ -66,11 +66,13 @@
 - 数据存储于 SQLite（`data/tasksync.db`），WAL 模式，支持并发读写
 ### 知识图谱（`/knowledge/graph`）
 
-AI 分析所有条目，自动聚类并发现条目间关联。
+AI 分析所有条目，自动聚类并发现条目间关联，以 Canvas 力导向图可视化呈现。
 
-- 按主题聚类，每个簇展示标签和所含条目（可折叠）
-- 关联关系表：扩展 / 相关 / 前置 / 矛盾，带彩色标签
-- 结果持久化到 `data/knowledge_graph.json`，可随时重新生成
+- **力导向图**：节点按聚类着色，边按关系类型（扩展/相关/前置/矛盾）用不同颜色和线型区分
+- 支持拖拽节点、hover 显示标题、点击跳转知识库详情
+- 聚类列表：每个簇展示主题和所含条目（可折叠）
+- 关联关系表：带彩色标签的条目间关系一览
+- 结果持久化到 SQLite，可随时重新生成
 
 ### 技能树（`/knowledge/skills`）
 
@@ -78,17 +80,7 @@ AI 分析所有条目，自动聚类并发现条目间关联。
 
 - 已掌握技能：按语言 / 框架 / 工具 / 概念 / 领域分组，显示熟练度和来源条目
 - 推荐学习：AI 推荐 5-10 个互补技能，附推荐理由和父技能关联
-- 结果持久化到 `data/skill_tree.json`
-
-### 知识校验（`/knowledge/validate`）
-
-手动选择条目，AI 核查事实准确性，用户审核后决定是否采纳修正。
-
-- 勾选要校验的条目（建议每次 ≤10 条）
-- AI 两阶段处理：先判断是否含可核实事实，再给出 正确 / 已过时 / 有误 / 无法核实 四种裁定
-- 有问题的条目显示具体问题描述、建议修正内容和 AI 生成引用
-- 点击「采纳修改」直接更新条目正文；「忽略」标记跳过
-- 结果持久化到 `data/validation_results.json`
+- 结果持久化到 SQLite
 
 ### 洞察（`/insights`）
 
@@ -119,18 +111,27 @@ python app.py
 
 ```
 TaskSync/
-├── app.py                  # Flask 路由
-├── task_decomposer.py      # AI 任务拆解
-├── task_store.py           # 任务 SQLite 存储层
+├── app.py                  # Flask 入口，蓝图注册（~30 行）
+├── blueprints/
+│   ├── tasks.py            # 任务 / 子任务 / 日历生成路由
+│   ├── knowledge.py        # 知识库 CRUD 路由
+│   ├── graph.py            # 知识图谱路由
+│   ├── skills.py           # 技能树路由
+│   └── calendar.py         # 日历路由
+├── stores/
+│   ├── db.py               # 共享 get_conn()、DB_PATH
+│   ├── task_store.py       # 任务 SQLite 存储层
+│   └── knowledge_store.py  # 知识库 SQLite 存储层
+├── ai/
+│   ├── task_decomposer.py  # AI 任务拆解
+│   ├── knowledge_ai.py     # AI：条目分析
+│   ├── knowledge_graph_ai.py # AI：知识图谱生成
+│   └── skill_tree_ai.py    # AI：技能树生成
 ├── calendar_generator.py   # .ics 生成
-├── knowledge_store.py      # 知识库 SQLite 存储层
-├── knowledge_ai.py         # AI：条目分析
-├── knowledge_graph_ai.py   # AI：知识图谱生成
-├── skill_tree_ai.py        # AI：技能树生成
-├── validation_ai.py        # AI：知识校验
 ├── migrate.py              # JSON → SQLite 一次性迁移脚本
 ├── static/
-│   └── api-config.js       # 统一 API 配置（localStorage 持久化）
+│   ├── api-config.js       # 统一 API 配置（localStorage 持久化）
+│   └── graph-renderer.js   # Canvas 力导向图（无外部依赖）
 ├── templates/
 │   ├── index.html          # 任务列表 / 日历生成页
 │   ├── task_detail.html    # 任务详情 / 执行跟踪页
@@ -138,8 +139,7 @@ TaskSync/
 │   ├── insights.html       # 洞察看板页
 │   ├── knowledge.html      # 知识库主页
 │   ├── knowledge_graph.html # 知识图谱页面
-│   ├── skill_tree.html     # 技能树页面
-│   └── validation.html     # 知识校验页面
+│   └── skill_tree.html     # 技能树页面
 ├── data/                   # 运行时生成，已 gitignore
 │   └── tasksync.db         # SQLite 数据库（任务、知识库、图谱等）
 ├── requirements.txt
@@ -203,4 +203,6 @@ python migrate.py
 - [x] **移动端优化**：知识库详情页长文本的滚动体验
 - [x] **桌面端适配**：≥768px 侧边栏导航、知识库详情侧边面板、悬停交互效果
 - [x] **知识库搜索增强**：支持多标签组合过滤
-- [x] **批量操作**：批量删除 / 导出选中条目
+- [x] **知识图谱 Canvas 可视化**：力导向图，节点拖拽、hover 提示、点击跳转，无外部依赖
+- [x] **架构重构**：app.py 拆分为 5 个蓝图，stores/ 共享数据层，ai/ 独立模块，消除跨模块循环依赖
+- [x] **多标签过滤性能**：改用纯 SQL GROUP BY + HAVING COUNT，消除 N+1 查询

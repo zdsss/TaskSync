@@ -50,6 +50,14 @@
     .empty-state { text-align: center; padding: 48px 16px; color: #aeaeb2; font-size: 15px; }
     .loading-state { text-align: center; padding: 48px 16px; color: #6e6e73; font-size: 15px; }
     .spinner-dark { display: inline-block; width: 20px; height: 20px; border: 2px solid #d1d1d6; border-top-color: #007aff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    .graph-canvas-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 16px; overflow: hidden; }
+    .graph-canvas-wrap canvas { display: block; width: 100%; }
+    .graph-legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 16px 14px; font-size: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; color: #6e6e73; }
+    .legend-line { width: 24px; height: 2px; }
+    @media (prefers-color-scheme: dark) {
+      .graph-canvas-wrap { background: #1c1c1e; }
+    }
 
     /* ── iOS Navigation Bar ── */
     .nav-bar { position: fixed; top: 0; left: 0; right: 0; height: calc(44px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgba(242,242,247,0.92); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 0.5px solid rgba(60,60,67,0.2); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }
@@ -85,6 +93,7 @@
 
   </style>
   <script src="/static/api-config.js"></script>
+  <script src="/static/graph-renderer.js"></script>
 </head>
 <body>
 
@@ -127,6 +136,17 @@
 
 <!-- STATE: graph -->
 <div id="stateGraph" class="hidden" style="margin-top:24px">
+  <!-- Canvas visualization -->
+  <div class="graph-canvas-wrap">
+    <canvas id="graphCanvas" height="420"></canvas>
+    <div class="graph-legend">
+      <span class="legend-item"><span class="legend-line" style="background:#007aff"></span>扩展</span>
+      <span class="legend-item"><span class="legend-line" style="background:#34c759;border-top:2px dashed #34c759;height:0"></span>相关</span>
+      <span class="legend-item"><span class="legend-line" style="background:#ff9500"></span>前置</span>
+      <span class="legend-item"><span class="legend-line" style="background:#ff3b30"></span>矛盾</span>
+    </div>
+  </div>
+
   <div class="section-title">📦 知识聚类</div>
   <div id="clustersContainer"></div>
 
@@ -159,8 +179,153 @@
   let aiOpen = false;
   let graphData = null;
   let entryMap = {};
+  let renderer = null;
 
   init();
+
+  async function init() {
+    const [graphRes, entriesRes] = await Promise.all([
+      fetch("/api/knowledge/graph"),
+      fetch("/api/knowledge"),
+    ]);
+    const data = await graphRes.json();
+    const entries = await entriesRes.json();
+    entries.forEach(e => { entryMap[e.id] = e; });
+    if (data.clusters && data.clusters.length) {
+      graphData = data;
+      showGraph();
+    }
+    fillApiConfigInputs({ apiKey: "aiApiKey", baseUrl: "aiBaseUrl", modelName: "aiModel" });
+  }
+
+  function toggleAi() {
+    aiOpen = !aiOpen;
+    document.getElementById("aiBody").classList.toggle("hidden", !aiOpen);
+    document.getElementById("aiArrow").textContent = aiOpen ? "▲" : "▼";
+  }
+
+  async function buildGraph() {
+    const apiKey = document.getElementById("aiApiKey").value.trim();
+    const baseUrl = document.getElementById("aiBaseUrl").value.trim();
+    const model = document.getElementById("aiModel").value.trim() || "claude-sonnet-4-5";
+    const errEl = document.getElementById("buildError");
+    errEl.classList.add("hidden");
+
+    if (!apiKey) { errEl.textContent = "请填写 API Key"; errEl.classList.remove("hidden"); return; }
+
+    collectAndSaveApiConfig({ apiKey: "aiApiKey", baseUrl: "aiBaseUrl", modelName: "aiModel" });
+    const btn = document.getElementById("buildBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateGraph").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.remove("hidden");
+
+    try {
+      const res = await fetch("/api/knowledge/graph/build", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "生成失败");
+      graphData = json;
+      document.getElementById("aiApiKey").value = "";
+      showGraph();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove("hidden");
+      document.getElementById("stateBuilding").classList.add("hidden");
+      document.getElementById("stateEmpty").classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "重新生成";
+    }
+  }
+
+  function showGraph() {
+    document.getElementById("stateEmpty").classList.add("hidden");
+    document.getElementById("stateBuilding").classList.add("hidden");
+    document.getElementById("stateGraph").classList.remove("hidden");
+    renderCanvas();
+    renderClusters();
+    renderRelationships();
+  }
+
+  function renderCanvas() {
+    if (renderer) renderer.destroy();
+    const canvas = document.getElementById("graphCanvas");
+    canvas.width = canvas.offsetWidth || canvas.parentElement.offsetWidth || 360;
+    renderer = new GraphRenderer(canvas, graphData, entryMap, function (id) {
+      window.location.href = "/knowledge#entry=" + encodeURIComponent(id);
+    });
+  }
+
+  function renderClusters() {
+    const container = document.getElementById("clustersContainer");
+    const clusters = graphData.clusters || [];
+    if (!clusters.length) {
+      container.innerHTML = '<div class="empty-state">无聚类数据</div>';
+      return;
+    }
+    container.innerHTML = clusters.map((c, i) => {
+      const entries = (c.entry_ids || []).map(id => entryMap[id]).filter(Boolean);
+      return `
+        <div class="cluster-card">
+          <div class="cluster-header" onclick="toggleCluster(${i})">
+            <div>
+              <div class="cluster-label">${escHtml(c.label)}</div>
+              <div class="cluster-theme">${escHtml(c.theme)}</div>
+            </div>
+            <span class="cluster-count">${entries.length} 条 <span id="clusterArrow${i}">▼</span></span>
+          </div>
+          <div class="cluster-body hidden" id="clusterBody${i}">
+            ${entries.length ? entries.map(e =>
+              `<a class="entry-link" href="/knowledge#entry=${encodeURIComponent(e.id)}">${escHtml(e.title)}</a>`
+            ).join("") : '<div style="color:#aeaeb2;font-size:13px;padding:8px 0">无匹配条目</div>'}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  function toggleCluster(i) {
+    const body = document.getElementById("clusterBody" + i);
+    const arrow = document.getElementById("clusterArrow" + i);
+    const hidden = body.classList.toggle("hidden");
+    arrow.textContent = hidden ? "▼" : "▲";
+  }
+
+  function renderRelationships() {
+    const rels = graphData.relationships || [];
+    const tbody = document.getElementById("relBody");
+    const empty = document.getElementById("relEmpty");
+    if (!rels.length) {
+      tbody.innerHTML = "";
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+    const REL_LABELS = { extends: "扩展", related: "相关", prerequisite: "前置", contradicts: "矛盾" };
+    tbody.innerHTML = rels.map(r => {
+      const from = entryMap[r.from_id];
+      const to = entryMap[r.to_id];
+      const fromTitle = from ? escHtml(from.title) : escHtml(r.from_id);
+      const toTitle = to ? escHtml(to.title) : escHtml(r.to_id);
+      const fromLink = from ? `<a href="/knowledge#entry=${encodeURIComponent(r.from_id)}" style="color:#007aff">${fromTitle}</a>` : fromTitle;
+      const toLink = to ? `<a href="/knowledge#entry=${encodeURIComponent(r.to_id)}" style="color:#007aff">${toTitle}</a>` : toTitle;
+      const rel = r.relation || "related";
+      return `<tr>
+        <td>${fromLink}</td>
+        <td><span class="rel-badge rel-${rel}">${REL_LABELS[rel] || rel}</span></td>
+        <td>${toLink}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function escHtml(str) {
+    return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+</script>
 
   async function init() {
     const [graphRes, entriesRes] = await Promise.all([
